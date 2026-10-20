@@ -1,0 +1,92 @@
+[
+ {
+  "id": "cherrymx-black-abs",
+  "name": "CherryMX Black - ABS keycaps",
+  "color": "#1f1f24"
+ },
+ {
+  "id": "cherrymx-black-pbt",
+  "name": "CherryMX Black - PBT keycaps",
+  "color": "#1f1f24"
+ },
+ {
+  "id": "cherrymx-blue-abs",
+  "name": "CherryMX Blue - ABS keycaps",
+  "color": "#3b82f6"
+ },
+ {
+  "id": "cherrymx-blue-pbt",
+  "name": "CherryMX Blue - PBT keycaps",
+  "color": "#3b82f6"
+ },
+ {
+  "id": "cherrymx-brown-abs",
+  "name": "CherryMX Brown - ABS keycaps",
+  "color": "#8b5a2b"
+ },
+ {
+  "id": "cherrymx-brown-pbt",
+  "name": "CherryMX Brown - PBT keycaps",
+  "color": "#8b5a2b"
+ },
+ {
+  "id": "cherrymx-red-abs",
+  "name": "CherryMX Red - ABS keycaps",
+  "color": "#ef4444"
+ },
+ {
+  "id": "cherrymx-red-pbt",
+  "name": "CherryMX Red - PBT keycaps",
+  "color": "#ef4444"
+ },
+ {
+  "id": "cream-travel",
+  "name": "Full Creamy Goodness",
+  "color": "#f2e3c6"
+ },
+ {
+  "id": "eg-crystal-purple",
+  "name": "EG Crystal Purple",
+  "color": "#a855f7"
+ },
+ {
+  "id": "eg-oreo",
+  "name": "EG Oreo",
+  "color": "#2b2b2b"
+ },
+ {
+  "id": "holy-pandas",
+  "name": "Holy Pandas",
+  "color": "#f5c542"
+ },
+ {
+  "id": "mxblack-travel",
+  "name": "MX Black - Full Travel",
+  "color": "#1f1f24"
+ },
+ {
+  "id": "mxblue-travel",
+  "name": "MX Blue - Full Travel",
+  "color": "#3b82f6"
+ },
+ {
+  "id": "mxbrown-travel",
+  "name": "MX Brown - Full Travel",
+  "color": "#8b5a2b"
+ },
+ {
+  "id": "nk-cream",
+  "name": "NK Cream (original by Ryan)",
+  "color": "#f2e3c6"
+ },
+ {
+  "id": "topre-purple-hybrid-pbt",
+  "name": "Topre Purple Hybrid - PBT keycaps",
+  "color": "#a855f7"
+ },
+ {
+  "id": "turquoise",
+  "name": "Turquoise (Full Travel)",
+  "color": "#2dd4bf"
+ }
+]

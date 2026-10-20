@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snake Tik · Juego</title>
+<style>
+@font-face { font-family: Lilita; src: url(/ui/fonts/LilitaOne.woff2) format("woff2"); }
+@font-face { font-family: Fredoka; src: url(/ui/fonts/Fredoka.woff2) format("woff2"); font-weight: 300 700; }
+html, body { margin: 0; height: 100%; background: #160b2b; overflow: hidden; user-select: none; }
+body { display: grid; place-items: center; }
+canvas { display: block; height: 100vh; width: calc(100vh * 9 / 16); max-width: 100vw; max-height: calc(100vw * 16 / 9); }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script src="/ui/guard.js"></script>
+<script src="/ui/snake-core.js"></script>
+<script src="/ui/sfx.js"></script>
+<script src="/ui/i18n.js"></script>
+<script src="/ui/render.js"></script>
+<script>
+'use strict';
+// La ventana del juego: lee eventos del programa (regalos, PERDER, ajustes) y dibuja con render.js.
+// Sin licencia el programa no entrega render.js / snake-core.js: se muestra el candado y se espera.
+if (!window.SnakeRender || !window.SnakeCore) {
+  const c = document.getElementById('c'), g = c.getContext('2d');
+  const draw = (msg) => {
+    g.fillStyle = '#160b2b'; g.fillRect(0, 0, 1080, 1920);
+    g.textAlign = 'center'; g.fillStyle = '#fff'; g.font = '160px sans-serif'; g.fillText('🔒', 540, 820);
+    g.font = '90px Lilita, sans-serif'; g.fillStyle = '#7be04a'; g.fillText('SNAKE TIK', 540, 1000);
+    g.font = '44px Fredoka, sans-serif'; g.fillStyle = '#fff'; g.fillText(msg || 'Inicia sesión en el programa', 540, 1100);
+  };
+  draw();
+  setInterval(async () => {
+    try { const r = await fetch('/api/poll?since=-1').then((x) => x.json()); if (!r.locked) location.reload(); else draw(r.locked); } catch {}
+  }, 2000);
+  throw new Error('sin licencia');
+}
+const R = SnakeRender.create(document.getElementById('c'), { sfx: SFX, i18n: I18N });
+document.addEventListener('pointerdown', () => SFX.unlock());
+
+let since = -1;
+async function poll() {
+  try {
+    const r = await fetch('/api/poll?since=' + since).then((x) => x.json());
+    const first = since < 0;
+    since = r.seq;
+    if (r.settings) R.applySettings(r.settings, first);
+    for (const e of r.events) {
+      if (e.type === 'add') R.gift(e.what, e.amount, e.nick, e.source);
+      else if (e.type === 'lose') R.fail();
+      else if (e.type === 'reset') R.reset();
+    }
+    if (r.locked !== undefined) R.setLocked(r.locked);
+  } catch { /* el programa se cerró: el juego sigue */ }
+  setTimeout(poll, 250);
+}
+poll();
+</script>
+</body>
+</html>

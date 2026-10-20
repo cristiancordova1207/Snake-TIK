@@ -1,0 +1,77 @@
+/* Temas de los programas de Wylo (skill /temas). 10 paletas con los mismos tokens:
+   --bg --panel --panel2 --panel3 --text --muted --violet --mint --pink --lime --amber --sky --red --on-accent --grad */
+:root, :root[data-theme="cozy-night"] {
+  --bg: #121016; --panel: #141118; --panel2: #1e1a24; --panel3: #2a2431; --text: #f6efe9; --muted: #a79fb0;
+  --violet: #b9a6f6; --mint: #9ee6df; --pink: #f6b8d1; --lime: #c7eea0; --amber: #f7d48b; --sky: #a9c4ff; --red: #f59a9a; --on-accent: #1b1622;
+  --grad: linear-gradient(135deg, var(--violet), var(--pink));
+}
+:root[data-theme="cozy-day"] {
+  --bg: #f7f1e8; --panel: #fdf9f3; --panel2: #f1e9de; --panel3: #e6dccf; --text: #2e2733; --muted: #7d7280;
+  --violet: #8b74e0; --mint: #4fb8ad; --pink: #e489ad; --lime: #7fbf4a; --amber: #e0a93a; --sky: #5f8ee6; --red: #e06a6a; --on-accent: #fff;
+  --grad: linear-gradient(135deg, var(--violet), var(--pink));
+}
+:root[data-theme="midnight"] {
+  --bg: #0b0e17; --panel: #0f1320; --panel2: #161c2d; --panel3: #20283d; --text: #e8eeff; --muted: #8a95b5;
+  --violet: #a58bff; --mint: #5ef0e6; --pink: #ff8fd0; --lime: #9dff9a; --amber: #ffd36e; --sky: #6fb6ff; --red: #ff7b8a; --on-accent: #0b0e17;
+  --grad: linear-gradient(135deg, var(--violet), var(--mint));
+}
+:root[data-theme="matcha"] {
+  --bg: #12160f; --panel: #161b13; --panel2: #1f261a; --panel3: #2a3323; --text: #eef3e4; --muted: #9cab90;
+  --violet: #c7b6f2; --mint: #a8e0c4; --pink: #f2bfae; --lime: #c9e88f; --amber: #f0d48c; --sky: #a9cbe0; --red: #f0a08f; --on-accent: #161b13;
+  --grad: linear-gradient(135deg, var(--lime), var(--mint));
+}
+:root[data-theme="sakura"] {
+  --bg: #fcf1f4; --panel: #fffafb; --panel2: #f7e4ea; --panel3: #efd3dc; --text: #3b2430; --muted: #8f6f7d;
+  --violet: #a77be0; --mint: #4fb3a3; --pink: #e0709a; --lime: #86b84e; --amber: #e0a03a; --sky: #6b9be6; --red: #e05a6a; --on-accent: #fff;
+  --grad: linear-gradient(135deg, var(--pink), var(--violet));
+}
+:root[data-theme="ocean"] {
+  --bg: #08141a; --panel: #0c1b22; --panel2: #12262f; --panel3: #1a333e; --text: #e4f4f7; --muted: #86a7b0;
+  --violet: #8fb4ff; --mint: #6fe0d0; --pink: #ff9fbf; --lime: #a6e8a0; --amber: #ffd27a; --sky: #6fcfff; --red: #ff8a8a; --on-accent: #08141a;
+  --grad: linear-gradient(135deg, var(--sky), var(--mint));
+}
+:root[data-theme="sunset"] {
+  --bg: #170e12; --panel: #1d1217; --panel2: #28181f; --panel3: #34202a; --text: #fbeee6; --muted: #b8999f;
+  --violet: #c99bff; --mint: #8fe0c8; --pink: #ff8fa8; --lime: #d6e88a; --amber: #ffbe76; --sky: #9fb8ff; --red: #ff7a7a; --on-accent: #1d1217;
+  --grad: linear-gradient(135deg, var(--amber), var(--pink));
+}
+:root[data-theme="mocha"] {
+  --bg: #15100d; --panel: #1b1511; --panel2: #251d17; --panel3: #31271f; --text: #f4e9de; --muted: #ae9d8e;
+  --violet: #c4a6e8; --mint: #a9d6c0; --pink: #e8a9a0; --lime: #c5d69a; --amber: #e6b27a; --sky: #a9bfe0; --red: #e88d80; --on-accent: #1b1511;
+  --grad: linear-gradient(135deg, var(--amber), var(--pink));
+}
+:root[data-theme="uva"] {
+  --bg: #110a18; --panel: #170e20; --panel2: #21152d; --panel3: #2c1d3b; --text: #f3eaff; --muted: #a596b8;
+  --violet: #c48cff; --mint: #7ee8d8; --pink: #ff8ad6; --lime: #b8f08a; --amber: #ffd480; --sky: #8fb0ff; --red: #ff8aa0; --on-accent: #170e20;
+  --grad: linear-gradient(135deg, var(--violet), var(--pink));
+}
+:root[data-theme="arctic"] {
+  --bg: #eef3f8; --panel: #f9fbfd; --panel2: #e3eaf2; --panel3: #d5dfea; --text: #1d2735; --muted: #687588;
+  --violet: #6d79e8; --mint: #2fa9a0; --pink: #d96aa7; --lime: #5fae5a; --amber: #d9962b; --sky: #3f8de0; --red: #d9534f; --on-accent: #fff;
+  --grad: linear-gradient(135deg, var(--sky), var(--violet));
+}
+
+/* Selector: rejilla de iconos con una pastilla en degradado que se desliza con rebote hasta el tema activo.
+   Ajusta columnas/filas con --cols / --rows en el contenedor (p. ej. 5×2 en una barra lateral, 10×1 en una cabecera). */
+.theme-picker {
+  --cols: 10; --rows: 1;
+  position: relative; display: grid; grid-template-columns: repeat(var(--cols), 1fr); padding: 4px; border-radius: 18px;
+  background: var(--panel2); border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); box-shadow: inset 0 2px 6px rgba(0,0,0,.18);
+}
+.theme-picker .tp-pill {
+  position: absolute; top: 4px; left: 4px; width: calc((100% - 8px) / var(--cols)); height: calc((100% - 8px) / var(--rows));
+  border-radius: 14px; background: var(--grad); pointer-events: none;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.35), 0 4px 12px -4px var(--violet);
+  transition: transform .6s cubic-bezier(.34,1.56,.64,1), background .4s;
+}
+.theme-picker button {
+  position: relative; z-index: 1; height: 30px; display: grid; place-items: center; border: 0; background: none; cursor: pointer;
+  border-radius: 14px; color: var(--muted); overflow: visible; padding: 0;
+}
+.theme-picker button:hover { color: var(--text); transform: none; }
+.theme-picker button:hover svg { animation: tp-wobble .7s cubic-bezier(.34,1.56,.64,1); }
+.theme-picker button.on { color: var(--on-accent); }
+.theme-picker button.on svg { animation: tp-pop .5s cubic-bezier(.34,1.56,.64,1); }
+.theme-picker svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes tp-wobble { 25% { transform: rotate(-12deg) scale(1.18); } 50% { transform: rotate(8deg) scale(.95); } 75% { transform: rotate(-4deg) scale(1.04); } }
+@keyframes tp-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
