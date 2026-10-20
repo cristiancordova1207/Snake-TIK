@@ -72,7 +72,7 @@
       speedup: false, countdown: 10, lang: 'es', discord: '', sound: null, title: 'SNAKE TIK', demo: false };
     let game = new SnakeCore.Game(20);
     let prevSnake = game.snake.slice();
-    let acc = 0, last = performance.now(), endAt = 0, shake = 0, locked = false;
+    let acc = 0, last = performance.now(), endAt = 0, shake = 0, locked = false, paused = false;
     const born = new Map();      // casilla -> {t, fx, fy} animación de caída
     const particles = [], toasts = [], airdrops = [];
     let banner = null, fullT0 = 0, lastTickSec = -1, pops = { w: 0, l: 0 }, lastSnd = {};
@@ -491,7 +491,7 @@
     // ---------- bucle ----------
     function frame(t) {
       const dt = Math.min(100, t - last); last = t;
-      if (!locked) {
+      if (!locked && !paused) {
         const tick = 1000 / currentSpeed();
         updatePlanes(t);
         if (game.state === 'play') {
@@ -532,6 +532,7 @@
       fail() { game.scheduleFail(Math.round(5 * currentSpeed())); },
       reset() { game.reset(); game.stallSteps = 15 * S.speed; prevSnake = game.snake.slice(); born.clear(); banner = null; airdrops.length = 0; fullT0 = 0; },
       setLocked(v) { locked = v; },
+      setPaused(v) { paused = !!v; last = performance.now(); },
       get game() { return game; },
       BOARDS, ANIMALS,
     };

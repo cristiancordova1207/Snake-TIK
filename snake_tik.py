@@ -24,7 +24,7 @@ from TikTokLive.events import (ConnectEvent, DisconnectEvent, GiftEvent,
 
 from account import Account, xcrypt
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 PORT = 5010
 
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -558,7 +558,66 @@ def already_running():
         return False
 
 
+# ---------- instalación (el .exe descargado se instala solo) ----------
+INSTALL_DIR = os.path.join(os.environ.get("LOCALAPPDATA", CFG_DIR), "Programs", "Snake Tik")
+INSTALLED_EXE = os.path.join(INSTALL_DIR, "Snake Tik.exe")
+UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\SnakeTik"
+
+
+def _shortcuts():
+    desktop = os.path.join(os.environ.get("USERPROFILE", ""), "Desktop")
+    start = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs")
+    return [os.path.join(desktop, "Snake Tik.lnk"), os.path.join(start, "Snake Tik.lnk")]
+
+
+def self_install():
+    """Si se ejecuta desde Descargas: se copia a %LOCALAPPDATA%\\Programs\\Snake Tik, crea accesos directos,
+    se registra en "Aplicaciones instaladas" y abre la copia instalada. Sin permisos de administrador."""
+    if not FROZEN or os.path.normcase(os.path.abspath(sys.executable)) == os.path.normcase(INSTALLED_EXE):
+        return
+    os.makedirs(INSTALL_DIR, exist_ok=True)
+    try:
+        shutil.copy2(sys.executable, INSTALLED_EXE)
+    except PermissionError:
+        pass  # ya instalado y abierto: solo lo enseñamos
+    ps = "; ".join(
+        f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}'); $s.TargetPath='{INSTALLED_EXE}'; "
+        f"$s.WorkingDirectory='{INSTALL_DIR}'; $s.IconLocation='{INSTALLED_EXE},0'; $s.Save()" for lnk in _shortcuts())
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=0x08000000)
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY) as k:
+            for name, val in (("DisplayName", "Snake Tik"), ("DisplayVersion", VERSION), ("Publisher", "Wylo"),
+                              ("DisplayIcon", INSTALLED_EXE), ("InstallLocation", INSTALL_DIR),
+                              ("UninstallString", f'"{INSTALLED_EXE}" --uninstall')):
+                winreg.SetValueEx(k, name, 0, winreg.REG_SZ, val)
+            winreg.SetValueEx(k, "NoModify", 0, winreg.REG_DWORD, 1)
+    except OSError:
+        pass
+    subprocess.Popen([INSTALLED_EXE])
+    sys.exit(0)
+
+
+def uninstall():
+    for lnk in _shortcuts():
+        try:
+            os.remove(lnk)
+        except OSError:
+            pass
+    try:
+        import winreg
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY)
+    except OSError:
+        pass
+    # la carpeta se borra cuando este proceso termina (los ajustes de %APPDATA%\SnakeTik se conservan)
+    subprocess.Popen(["cmd", "/c", f'timeout /t 2 /nobreak >nul & rmdir /s /q "{INSTALL_DIR}"'], creationflags=0x08000000)
+    sys.exit(0)
+
+
 if __name__ == "__main__":
+    if "--uninstall" in sys.argv:
+        uninstall()
+    self_install()
     if already_running():
         open_windows()
         sys.exit(0)
