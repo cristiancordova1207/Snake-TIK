@@ -64,13 +64,16 @@ function plansScreen() {
     $('#pLife').innerHTML = `$${p.lifetime.amount}`;
   }
   const pr = ACC.profile || {};
-  $('#pErr').textContent = pr.banned ? t('err_banned') : (pr.role === 'trial' ? t('trialLeft', { m: Math.floor((pr.trialSeconds || 0) / 60) }) : '');
+  $('#pEnded').hidden = !pr.trialEnded;
+  $('#pErr').textContent = pr.banned ? t('err_banned') : (pr.onTrial ? t('trialLeft', { m: Math.floor((pr.trialSeconds || 0) / 60) }) : '');
   $('#sPlans').hidden = false;
 }
 $$('[data-buy]').forEach((b) => b.onclick = async () => {
   const r = await api('/api/account/checkout', { plan: b.dataset.buy });
   if (r.error) $('#pErr').textContent = r.error; else toast('Stripe ✓');
 });
+// prueba de acceso: abre el canal de tickets del Discord de Wylo en el navegador normal
+$('#pTrial').onclick = () => { api('/api/open-trial', {}); toast('🎁 Discord'); };
 $('#pCheck').onclick = async () => { ACC = await api('/api/account?refresh=1'); route(); if (!ACC.allowed) toast('⏳'); };
 $('#pLogout').onclick = async () => { ACC = await api('/api/account/logout', {}); route(); };
 
@@ -256,8 +259,13 @@ function renderAccount() {
 }
 $('#adDiscordSave').onclick = async () => { const r = await api('/api/admin', { action: 'set_discord', discord: $('#adDiscord').value }); toast(r.ok ? '✓ ' + r.discord : r.error); ACC = await api('/api/account?refresh=1'); renderAccount(); };
 $('#adTrial').onclick = async () => {
-  const r = await api('/api/admin', { action: 'trial_create', username: $('#adTU').value.trim(), password: $('#adTP').value });
-  $('#adTrialMsg').textContent = r.user ? `✓ ${r.user.username} · 30 min · ${new Date(r.user.expires_at).toLocaleString()}` : (r.error || 'Error');
+  const r = await api('/api/admin', { action: 'trial_create', username: $('#adTU').value.trim(), password: $('#adTP').value, minutes: +$('#adTM').value || 30 });
+  $('#adTrialMsg').textContent = r.user ? `✓ ${r.user.username} · ${Math.round(r.user.trial_seconds / 60)} min · ${new Date(r.user.expires_at).toLocaleString()}` : (r.error || 'Error');
+};
+// prueba gratuita a una cuenta existente (o cambiar sus minutos; 0 = quitarla)
+$('#adGrant').onclick = async () => {
+  const r = await api('/api/admin', { action: 'trial_set', username: $('#adGU').value.trim(), minutes: Math.max(0, +$('#adGM').value || 0) });
+  $('#adGrantMsg').textContent = r.user ? `✓ ${r.user.username} · ${Math.round(r.user.trial_seconds / 60)} min` : (r.error === 'user_not_found' ? '✕ Ese usuario no existe' : (r.error || 'Error'));
 };
 
 // ---------------- navegación / estado ----------------

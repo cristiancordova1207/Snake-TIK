@@ -164,3 +164,4 @@ h1 em { font-style: normal; background: var(--grad); -webkit-background-clip: te
 .users { width: 100%; border-collapse: collapse; font-size: 13px; }
 .users td, .users th { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; }
 .users th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.banner-ended { margin: 0 auto 16px; max-width: 520px; padding: 10px 16px; border-radius: 12px; background: rgba(251,113,133,.16); color: #fda4af; font-weight: 700; text-align: center; }

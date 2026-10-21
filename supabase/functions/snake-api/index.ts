@@ -7,6 +7,10 @@ const SR = env.SUPABASE_SERVICE_ROLE_KEY;
 const SITE = 'https://snaketik.pages.dev';
 const TRIAL_SECONDS = 30 * 60;
 const MAX_TIKTOK = 3;
+const MAX_ACCOUNTS_PER_DEVICE = 2; // por PC (hwid) y por IP
+// Discord (bot de tickets): servidor y canales de Wylo. El token del bot vive solo en el secreto DISCORD_BOT_TOKEN.
+const GUILD = '1506294281801957406';
+const TICKET_CHANNEL = '1506987667408031845';
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 
 class ApiError extends Error { constructor(public code: string, public status = 400) { super(code); } }
@@ -65,12 +69,18 @@ async function cleanup() { // las cuentas de prueba duran 1 día
   await db('DELETE', `snake_users?role=eq.trial&expires_at=lt.${new Date().toISOString()}`, undefined, 'return=minimal');
 }
 
+function paid(u: any) {
+  if (u.role === 'admin' || u.plan === 'lifetime') return true;
+  return u.plan === 'monthly' && !!u.plan_until && new Date(u.plan_until) > new Date();
+}
+// prueba activa: cuentas de prueba (caducan al día) o prueba regalada a una cuenta normal (no caduca, solo gasta minutos)
+function onTrial(u: any) {
+  if (paid(u) || !(u.trial_seconds > 0)) return false;
+  return u.role !== 'trial' || (!!u.expires_at && new Date(u.expires_at) > new Date());
+}
 function allowed(u: any) {
   if (u.banned) return false;
-  if (u.role === 'admin' || u.plan === 'lifetime') return true;
-  if (u.plan === 'monthly') return u.plan_until && new Date(u.plan_until) > new Date();
-  if (u.role === 'trial') return u.trial_seconds > 0 && u.expires_at && new Date(u.expires_at) > new Date();
-  return false;
+  return paid(u) || onTrial(u);
 }
 
 async function userFromToken(token?: string) {
@@ -88,6 +98,7 @@ async function profile(u: any) {
   const ok = allowed(u);
   return {
     username: u.username, role: u.role, plan: u.plan, planUntil: u.plan_until, trialSeconds: u.trial_seconds,
+    onTrial: onTrial(u), trialEnded: !ok && !paid(u) && u.trial_seconds === 0 && (u.role === 'trial' || u.plan === 'trial'),
     expiresAt: u.expires_at, banned: u.banned, allowed: ok, tiktoks, maxTiktok: MAX_TIKTOK,
     discord: await setting('discord'), assetKey: ok ? env.SNAKE_ASSET_KEY : null,
   };
@@ -117,15 +128,23 @@ const USER_RE = /^[A-Za-z0-9_.]{3,20}$/;
 
 // ---------- acciones ----------
 const actions: Record<string, (b: any, req: Request) => Promise<unknown>> = {
-  async register(b) {
+  async register(b, req) {
     const username = String(b.username || '').trim(), password = String(b.password || '');
     if (!USER_RE.test(username)) throw new ApiError('bad_username');
     if (password.length < 6) throw new ApiError('short_password');
     if (password !== b.confirm) throw new ApiError('password_mismatch');
     const exists = await db('GET', `snake_users?username_lc=eq.${encodeURIComponent(username.toLowerCase())}&select=id`);
     if (exists[0]) throw new ApiError('username_taken');
+    // máximo 2 cuentas por PC (huella del equipo) y por IP
+    const hwid = /^[0-9a-f]{64}$/.test(String(b.hwid || '')) ? String(b.hwid) : null;
+    const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || null;
+    const or = [hwid && `hwid.eq.${hwid}`, ip && `signup_ip.eq.${encodeURIComponent(ip)}`].filter(Boolean).join(',');
+    if (or) {
+      const same = await db('GET', `snake_users?select=id&or=(${or})`);
+      if (same.length >= MAX_ACCOUNTS_PER_DEVICE) throw new ApiError('too_many_accounts', 403);
+    }
     const hash = await rpc('snake_hash', { p: password });
-    const u = (await db('POST', 'snake_users', { username, pass_hash: hash, app_version: b.version || null }))[0];
+    const u = (await db('POST', 'snake_users', { username, pass_hash: hash, app_version: b.version || null, hwid, signup_ip: ip }))[0];
     return { token: await newSession(u.id), profile: await profile(u) };
   },
   async login(b) {
@@ -154,7 +173,7 @@ const actions: Record<string, (b: any, req: Request) => Promise<unknown>> = {
         await db('POST', 'snake_lives', { user_id: u.id, tiktok: b.tiktok }, 'return=minimal');
         await announceLive(String(b.tiktok));
       }
-      if (u.role === 'trial') patch.trial_seconds = Math.max(0, u.trial_seconds - Math.round(elapsed));
+      if (onTrial(u)) patch.trial_seconds = Math.max(0, u.trial_seconds - Math.round(elapsed)); // nunca a quien ya paga
     }
     u = (await db('PATCH', `snake_users?id=eq.${u.id}`, patch))[0];
     return { profile: await profile(u) };
@@ -203,13 +222,13 @@ const actions: Record<string, (b: any, req: Request) => Promise<unknown>> = {
   // ---------- administrador (Wylo / Stats Fluxy) ----------
   async admin_users(b) {
     await admin(b);
-    const users = await db('GET', 'snake_users?select=id,username,role,plan,plan_until,trial_seconds,expires_at,banned,created_at,last_seen,app_version,stripe_sub&order=created_at.desc');
+    const users = await db('GET', 'snake_users?select=id,username,role,plan,plan_until,trial_seconds,expires_at,banned,created_at,last_seen,app_version,stripe_sub,signup_ip,hwid&order=created_at.desc');
     const tk = await db('GET', 'snake_tiktok?select=user_id,username');
     const pays = await db('GET', 'snake_payments?select=user_id,amount_cents');
     const lives = await db('GET', 'snake_lives?select=user_id,seconds');
     return {
       users: users.map((u: any) => ({
-        ...u, allowed: allowed(u),
+        ...u, hwid: u.hwid ? u.hwid.slice(0, 10) : null, allowed: allowed(u), onTrial: onTrial(u),
         tiktoks: tk.filter((t: any) => t.user_id === u.id).map((t: any) => t.username),
         paid: pays.filter((p: any) => p.user_id === u.id).reduce((a: number, p: any) => a + p.amount_cents, 0) / 100,
         liveSeconds: lives.filter((l: any) => l.user_id === u.id).reduce((a: number, l: any) => a + l.seconds, 0),
@@ -228,6 +247,51 @@ const actions: Record<string, (b: any, req: Request) => Promise<unknown>> = {
     }))[0];
     return { user: { id: u.id, username: u.username, expires_at: u.expires_at, trial_seconds: u.trial_seconds } };
   },
+  // prueba gratuita para una cuenta que ya existe (por nombre o id) o cambiar sus minutos. La cuenta no se borra nunca.
+  async admin_trial_set(b) {
+    await admin(b);
+    const minutes = Math.max(0, Math.min(100000, Math.round(Number(b.minutes))));
+    if (!Number.isFinite(minutes)) throw new ApiError('bad_input');
+    const q = b.user_id ? `id=eq.${encodeURIComponent(b.user_id)}` : `username_lc=eq.${encodeURIComponent(String(b.username || '').trim().toLowerCase())}`;
+    const u = (await db('GET', `snake_users?${q}&select=id,username,role,plan`))[0];
+    if (!u) throw new ApiError('user_not_found', 404);
+    const patch: Record<string, unknown> = { trial_seconds: minutes * 60 };
+    if (u.role !== 'trial' && u.plan === 'none' && minutes > 0) patch.plan = 'trial'; // para avisarle cuando termine
+    const out = (await db('PATCH', `snake_users?id=eq.${u.id}`, patch))[0];
+    return { user: { id: out.id, username: out.username, trial_seconds: out.trial_seconds } };
+  },
+
+  // estadísticas de descargas de los programas (antes públicas con la clave anon; ahora solo el administrador)
+  async admin_fluxy_stats(b) {
+    await admin(b);
+    return await rpc('fluxy_stats', { p_app: b.p_app || null, p_days: Math.max(1, Math.min(3650, Number(b.p_days) || 30)) });
+  },
+
+  // ---------- Discord (bot de tickets) ----------
+  async admin_discord_channels(b) {
+    await admin(b);
+    const ch = await discord('GET', `guilds/${GUILD}/channels`);
+    const cats = Object.fromEntries(ch.filter((c: any) => c.type === 4).map((c: any) => [c.id, c.name]));
+    return { channels: ch.filter((c: any) => c.type === 0).sort((a: any, z: any) => a.position - z.position).map((c: any) => ({ id: c.id, name: c.name, category: cats[c.parent_id] || '' })) };
+  },
+  async admin_discord_send(b) {
+    await admin(b);
+    const content = String(b.content || '').slice(0, 2000);
+    if (!/^\d{5,25}$/.test(String(b.channel_id || '')) || !content.trim()) throw new ApiError('bad_input');
+    const m = await discord('POST', `channels/${b.channel_id}/messages`, { content, allowed_mentions: { parse: b.mentions ? ['everyone', 'roles', 'users'] : [] } });
+    return { ok: true, id: m.id };
+  },
+  // registra /ticket-panel y publica el panel "Create ticket" en el canal de tickets
+  async admin_discord_setup(b) {
+    await admin(b);
+    const app = await discord('GET', 'oauth2/applications/@me');
+    await discord('PUT', `applications/${app.id}/guilds/${GUILD}/commands`, [
+      { name: 'ticket-panel', description: 'Publica el panel de tickets en este canal', default_member_permissions: '8' },
+    ]);
+    const m = await discord('POST', `channels/${b.channel_id || TICKET_CHANNEL}/messages`, ticketPanel());
+    return { ok: true, message: m.id, application: app.id };
+  },
+
   async admin_reset_tiktok(b) { await admin(b); await db('DELETE', `snake_tiktok?user_id=eq.${b.user_id}`, undefined, 'return=minimal'); return { ok: true }; },
   async admin_cancel(b) {
     await admin(b);
@@ -308,6 +372,25 @@ const actions: Record<string, (b: any, req: Request) => Promise<unknown>> = {
     };
   },
 };
+
+async function discord(method: string, path: string, body?: unknown) {
+  if (!env.DISCORD_BOT_TOKEN) throw new ApiError('discord_not_configured', 500);
+  const r = await fetch(`https://discord.com/api/v10/${path}`, {
+    method, headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const txt = await r.text();
+  if (!r.ok) throw new ApiError('discord:' + txt.slice(0, 160), 502);
+  return txt ? JSON.parse(txt) : null;
+}
+// el mismo panel que publica /ticket-panel desde el bot
+function ticketPanel() {
+  return {
+    embeds: [{ title: '🎫 Tickets', color: 0x8b5cf6,
+      description: 'Press **Create ticket** to buy a product, get support or request a free trial.\nPulsa **Create ticket** para comprar un producto, pedir ayuda o solicitar una prueba gratuita.' }],
+    components: [{ type: 1, components: [{ type: 2, style: 3, label: 'Create ticket', emoji: { name: '📩' }, custom_id: 'tk_open' }] }],
+  };
+}
 
 async function admin(b: any) {
   const u = await userFromToken(b.token);

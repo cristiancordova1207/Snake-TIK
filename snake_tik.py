@@ -24,7 +24,7 @@ from TikTokLive.events import (ConnectEvent, DisconnectEvent, GiftEvent,
 
 from account import Account, xcrypt
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 PORT = 5010
 
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -111,6 +111,8 @@ def lock_reason():
     if ACC.profile.get("banned"):
         return "Cuenta suspendida"
     if not ACC.allowed():
+        if ACC.profile.get("trialEnded"):
+            return "Tu prueba gratuita terminó · Elige un plan en el programa"
         return "Activa tu plan en el programa"
     return None
 
@@ -511,6 +513,16 @@ def api_update():
 @app.post("/api/open-game")
 def api_open_game():
     open_windows(("game",))
+    return jsonify({"ok": True})
+
+
+# canal de tickets del Discord de Wylo: ahí se pide la prueba de acceso
+TRIAL_TICKETS_URL = "https://discord.com/channels/1506294281801957406/1506987667408031845"
+
+
+@app.post("/api/open-trial")
+def api_open_trial():
+    open_url(TRIAL_TICKETS_URL)  # en el Chrome normal (donde tiene la sesión de Discord), no en la ventana del panel
     return jsonify({"ok": True})
 
 

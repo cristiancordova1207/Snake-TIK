@@ -63,6 +63,18 @@ def xcrypt(data: bytes, key_hex: str) -> bytes:
     return bytes(out)
 
 
+def machine_id():
+    """Huella del PC para limitar cuentas por equipo: sha256 del MachineGuid de Windows (nunca se envía el valor en claro)."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography", 0,
+                            winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as k:
+            guid = winreg.QueryValueEx(k, "MachineGuid")[0]
+    except OSError:
+        return ""
+    return hashlib.sha256(f"snaketik:{guid}".encode()).hexdigest()
+
+
 class Account:
     def __init__(self, cfg_dir, version):
         self.path = os.path.join(cfg_dir, "session.dat")
@@ -120,7 +132,7 @@ class Account:
         return self._take(self.call("login", username=username, password=password))
 
     def register(self, username, password, confirm):
-        return self._take(self.call("register", username=username, password=password, confirm=confirm))
+        return self._take(self.call("register", username=username, password=password, confirm=confirm, hwid=machine_id()))
 
     def logout(self):
         if self.token:

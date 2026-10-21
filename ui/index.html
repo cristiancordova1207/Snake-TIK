@@ -133,8 +133,12 @@
         <div class="card"><h3><span class="ic">💬</span><span data-i18n="discordLink"></span></h3>
           <div class="row"><input id="adDiscord" style="flex:1"><button class="btn btn-primary btn-sm jelly" id="adDiscordSave" data-i18n="save"></button></div>
           <p class="hint">Solo tú puedes cambiarlo: lo guarda el servidor y lo ven todos los usuarios.</p></div>
-        <div class="card"><h3><span class="ic">⏱️</span>Prueba gratuita (30 min, 1 día)</h3>
-          <div class="row"><input id="adTU" placeholder="usuario" style="flex:1"><input id="adTP" placeholder="contraseña" style="flex:1"><button class="btn btn-green btn-sm jelly" id="adTrial">Crear</button></div>
+        <div class="card"><h3><span class="ic">🎁</span>Otorgar prueba gratuita</h3>
+          <p class="hint">A una cuenta que ya existe (pregúntale su usuario). Pon los minutos de directo; con 0 se la quitas. Su cuenta no se borra.</p>
+          <div class="row"><input id="adGU" placeholder="usuario" style="flex:1"><input id="adGM" type="number" min="0" value="30" style="width:90px" title="minutos"><span class="hint">min</span><button class="btn btn-green btn-sm jelly" id="adGrant">Otorgar</button></div>
+          <p class="hint" id="adGrantMsg"></p></div>
+        <div class="card"><h3><span class="ic">⏱️</span>Crear cuenta de prueba (se borra en 1 día)</h3>
+          <div class="row"><input id="adTU" placeholder="usuario" style="flex:1"><input id="adTP" placeholder="contraseña" style="flex:1"><input id="adTM" type="number" min="1" value="30" style="width:80px" title="minutos"><button class="btn btn-green btn-sm jelly" id="adTrial">Crear</button></div>
           <p class="hint" id="adTrialMsg">También desde Stats Fluxy, con la lista completa de cuentas e ingresos.</p></div>
       </div>
     </section>
@@ -170,16 +174,18 @@
 <!-- planes -->
 <div class="screen wide" id="sPlans" hidden><div class="box">
   <h2 data-i18n="plansTitle"></h2><p class="lead" data-i18n="plansSub"></p>
+  <p class="banner-ended" id="pEnded" data-i18n="trialEndedMsg" hidden></p>
   <div class="plans">
     <div class="plan best"><b data-i18n="monthly"></b><div class="price" id="pMonthly"></div><span class="badge green" id="pLaunch"></span>
-      <ul><li>🐍 Snake Tik completo</li><li>🎁 Todos los regalos</li><li>🔄 Actualizaciones</li></ul>
+      <ul><li>🐍 <span data-i18n="featFull"></span></li><li>🎁 <span data-i18n="featGifts"></span></li><li>🔄 <span data-i18n="featUpdates"></span></li></ul>
       <button class="btn btn-primary jelly" data-buy="monthly" data-i18n="buy"></button></div>
     <div class="plan"><b data-i18n="lifetime"></b><div class="price" id="pLife"></div><span class="badge amber" data-i18n="once"></span>
-      <ul><li>♾️ Para siempre</li><li>🎁 Todos los regalos</li><li>🔄 Actualizaciones</li></ul>
+      <ul><li>♾️ <span data-i18n="featForever"></span></li><li>🎁 <span data-i18n="featGifts"></span></li><li>🔄 <span data-i18n="featUpdates"></span></li></ul>
       <button class="btn btn-ghost jelly" data-buy="lifetime" data-i18n="buy"></button></div>
   </div>
   <div class="row" style="justify-content:center;margin-top:18px">
     <button class="btn btn-green jelly" id="pCheck" data-i18n="paid"></button>
+    <button class="btn btn-ghost jelly" id="pTrial">🎁 <span data-i18n="requestTrial"></span></button>
     <button class="btn btn-ghost btn-sm jelly" id="pLogout" data-i18n="logout"></button>
   </div>
   <p class="err" id="pErr" style="text-align:center"></p>
