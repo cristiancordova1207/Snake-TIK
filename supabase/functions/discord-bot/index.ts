@@ -18,7 +18,9 @@ const PRODUCTS: [string, string, string, string][] = [
   ['auction-board', 'Auction Board', 'AuctionBoard', '🎬'],
 ];
 const TRIALS = ['snake-tiktok-afk']; // juegos con prueba gratuita
-const CATEGORIES = { buy: 'Tickets Compras', support: 'Tickets Support', trial: 'Tickets Pruebas' } as const;
+// categorías del servidor (se buscan por nombre sin emojis; la primera de la lista es la que se crea si no existe ninguna)
+const CATEGORIES = { buy: ['Ticket Buy', 'Tickets Compras'], support: ['Ticket Support', 'Tickets Support'], trial: ['Ticket Trial', 'Tickets Pruebas'] } as const;
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // permisos: ver canal 1024 · enviar 2048 · insertar enlaces 16384 · adjuntar 32768 · historial 65536 · gestionar canales 16
 const P_USER = String(1024 + 2048 + 16384 + 32768 + 65536);
@@ -68,12 +70,13 @@ export function ticketPanel() {
 }
 
 // ---------- crear el ticket ----------
-async function category(kind: keyof typeof CATEGORIES, channels: any[]) {
-  const name = CATEGORIES[kind];
-  const found = channels.find((c) => c.type === 4 && c.name.toLowerCase() === name.toLowerCase());
-  if (found) return found.id;
-  const c = await discord('POST', `guilds/${GUILD}/channels`, {
-    name, type: 4, permission_overwrites: [{ id: GUILD, type: 0, deny: '1024' }],
+async function category(kind: keyof typeof CATEGORIES, channels: any[], appId: string) {
+  for (const name of CATEGORIES[kind]) {
+    const found = channels.find((c) => c.type === 4 && norm(c.name) === norm(name));
+    if (found) return found.id;
+  }
+  const c = await discord('POST', `guilds/${GUILD}/channels`, { // el bot se deja ver a sí mismo para poder crear canales dentro
+    name: `🎫 ${CATEGORIES[kind][0]}`, type: 4, permission_overwrites: [{ id: GUILD, type: 0, deny: '1024' }, { id: appId, type: 1, allow: P_BOT }],
   });
   return c.id;
 }
@@ -105,12 +108,12 @@ async function createTicket(i: any, kind: 'buy' | 'support' | 'trial', product: 
     const open = await db('GET', `snake_tickets?discord_user=eq.${user}&kind=eq.${kind}&closed_at=is.null&select=id,channel_id,product`);
     const same = open.find((t: any) => (t.product ?? null) === product && channels.some((c: any) => c.id === t.channel_id));
     if (same) return followUp(`🎫 You already have this ticket open / Ya tienes este ticket abierto: <#${same.channel_id}>`);
-    const parent = await category(kind, channels);
+    const parent = await category(kind, channels, i.application_id);
     const t = (await db('POST', 'snake_tickets', { kind, product, discord_user: user, discord_name: uname }))[0];
     const p = PRODUCTS.find((x) => x[0] === product);
-    const label = kind === 'support' ? 'Support' : kind === 'trial' ? `Trial${p?.[2] ?? ''}` : (p?.[2] ?? 'Ticket');
+    const label = kind === 'support' ? 'Support' : kind === 'trial' ? `Trial · ${p?.[1] ?? product}` : (p?.[1] ?? 'Ticket');
     const ch = await discord('POST', `guilds/${GUILD}/channels`, {
-      name: `${label.toLowerCase()}-${t.id}`, type: 0, parent_id: parent, topic: `${label}#${t.id} · @${uname}`,
+      name: `ticket-${t.id}`, type: 0, parent_id: parent, topic: `Ticket #${t.id} · ${label} · @${uname}`,
       permission_overwrites: [
         { id: GUILD, type: 0, deny: '1024' },
         { id: user, type: 1, allow: P_USER },
@@ -119,7 +122,7 @@ async function createTicket(i: any, kind: 'buy' | 'support' | 'trial', product: 
     });
     await db('PATCH', `snake_tickets?id=eq.${t.id}`, { channel_id: ch.id });
     await discord('POST', `channels/${ch.id}/messages`, {
-      embeds: [{ title: `🎫 ${label}#${t.id}`, color: kind === 'support' ? 0x25f4ee : kind === 'trial' ? 0xd9ff6b : 0xfe2c55,
+      embeds: [{ title: `🎫 Ticket #${t.id} · ${label}`, color: kind === 'support' ? 0x25f4ee : kind === 'trial' ? 0xd9ff6b : 0xfe2c55,
         description: welcome(kind, product, user) }],
       components: [row(btn('tk_close', 'Close ticket', '🔒', 4))],
       allowed_mentions: { users: [user] },
