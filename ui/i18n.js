@@ -15,6 +15,11 @@
     incoming: { es: 'en camino', en: 'incoming', pt: 'chegando', fr: 'en route', de: 'unterwegs', it: 'in arrivo' },
     airdrop: { es: '¡AIRDROP!', en: 'AIRDROP!', pt: 'AIRDROP!', fr: 'LARGAGE !', de: 'AIRDROP!', it: 'AIRDROP!' },
     blasted: { es: '¡BOOM! Cola destruida', en: 'BOOM! Tail destroyed', pt: 'BOOM! Cauda destruída', fr: 'BOUM ! Queue détruite', de: 'BUMM! Schwanz zerstört', it: 'BOOM! Coda distrutta' },
+    pausedMsg: { es: 'En pausa', en: 'Paused', pt: 'Pausado', fr: 'En pause', de: 'Pausiert', it: 'In pausa' },
+    pauseBtn: { es: 'Pausar', en: 'Pause', pt: 'Pausar', fr: 'Pause', de: 'Pause', it: 'Pausa' },
+    resumeBtn: { es: 'Reanudar', en: 'Resume', pt: 'Continuar', fr: 'Reprendre', de: 'Fortsetzen', it: 'Riprendi' },
+    stopBtn: { es: 'Volver al inicio', en: 'Back to start', pt: 'Voltar ao início', fr: 'Retour au début', de: 'Zurück zum Start', it: "Torna all'inizio" },
+    stopQ: { es: '¿Volver a la pantalla de Start? La partida actual se reinicia.', en: 'Go back to the Start screen? The current game restarts.', pt: 'Voltar à tela de Start? A partida atual reinicia.', fr: "Revenir à l'écran Start ? La partie en cours redémarre.", de: 'Zurück zum Startbildschirm? Das aktuelle Spiel startet neu.', it: 'Tornare alla schermata Start? La partita attuale riparte.' },
     pressStart: { es: 'Pulsa Start en el panel', en: 'Press Start in the panel', pt: 'Aperte Start no painel', fr: 'Appuie sur Start dans le panneau', de: 'Drücke Start im Panel', it: 'Premi Start nel pannello' },
     // ---- panel ----
     resetStats: { es: 'Reiniciar partidas y muertes', en: 'Reset wins & deaths', pt: 'Zerar vitórias e mortes', fr: 'Remettre victoires et morts à 0', de: 'Siege & Tode zurücksetzen', it: 'Azzera vittorie e morti' },

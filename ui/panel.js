@@ -111,7 +111,9 @@ $('#disconnect').onclick = () => api('/api/disconnect', {});
 $('#openGame').onclick = () => api('/api/open-game', {});
 $('#lose').onclick = () => { api('/api/command', { cmd: 'lose' }); toast('💀 ' + t('loseBtn') + '…'); };
 $('#reset').onclick = () => api('/api/command', { cmd: 'reset' });
-$('#start').onclick = () => { api('/api/command', { cmd: 'start' }); $('#start').hidden = true; };
+$('#start').onclick = () => { api('/api/command', { cmd: 'start' }); $('#start').hidden = true; $('#playCtl').hidden = false; };
+$('#pause').onclick = () => api('/api/command', { cmd: 'pause' });
+$('#stop').onclick = () => { if (!confirm(t('stopQ'))) return; api('/api/command', { cmd: 'stop' }); $('#start').hidden = false; $('#playCtl').hidden = true; };
 $('#resetStats').onclick = () => { save({ stats: { wins: 0, losses: 0 } }); toast('🏆 0 · 💀 0'); };
 $('#nolose').onclick = () => save({ nolose: !S.cfg.nolose }).then(() => $('#nolose').classList.toggle('on', !!S.cfg.nolose));
 $('#fillholes').onclick = () => save({ fillholes: !S.cfg.fillholes }).then(() => $('#fillholes').classList.toggle('on', !!S.cfg.fillholes));
@@ -281,6 +283,8 @@ async function poll() {
     $('#sTT').textContent = st === 'live' ? t('live') : st === 'connecting' ? t('connecting') : t('offline');
     $('#dG').className = 'dot ' + (s.game ? 'on' : ''); $('#sG').textContent = s.game ? t('gameOpen') : t('gameClosed');
     $('#start').hidden = !!s.started;
+    $('#playCtl').hidden = !s.started;
+    $('#pause').textContent = s.paused ? '▶ ' + t('resumeBtn') : '⏸ ' + t('pauseBtn');
     if (document.activeElement !== $('#wins') && document.activeElement !== $('#losses')) { $('#wins').value = s.cfg.stats.wins; $('#losses').value = s.cfg.stats.losses; }
     if (s.error) $('#ttErr').textContent = s.error.includes('no está en directo') ? t('err_offlineLive') : s.error;
     $('#log').innerHTML = s.log.map((l) => `<div><time>${new Date(l.t * 1000).toLocaleTimeString()}</time>${esc(l.text)}</div>`).join('') || '<div class="hint">—</div>';

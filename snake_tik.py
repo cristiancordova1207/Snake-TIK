@@ -24,7 +24,7 @@ from TikTokLive.events import (ConnectEvent, DisconnectEvent, GiftEvent,
 
 from account import Account, xcrypt
 
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 PORT = 5010
 
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -76,7 +76,7 @@ events = deque(maxlen=2000)
 log = deque(maxlen=200)
 seq = 0
 gift_catalog = {}
-state = {"status": "off", "error": "", "game_seen": 0.0, "likes": {}, "fired": {}, "tiktok": "", "started": False}
+state = {"status": "off", "error": "", "game_seen": 0.0, "likes": {}, "fired": {}, "tiktok": "", "started": False, "paused": False}
 client_box = {"client": None, "loop": None}
 
 
@@ -281,7 +281,7 @@ def api_poll():
     settings = {k: cfg[k] for k in LIVE_SETTINGS}
     if ACC.profile and ACC.profile.get("discord") is not None:
         settings["discord"] = ACC.profile["discord"]  # el enlace lo decide el admin desde el servidor
-    return jsonify({"seq": cur, "events": out, "settings": settings, "locked": lock_reason() or False, "started": state["started"]})
+    return jsonify({"seq": cur, "events": out, "settings": settings, "locked": lock_reason() or False, "started": state["started"], "paused": state["paused"]})
 
 
 @app.post("/api/stats")
@@ -296,7 +296,7 @@ def api_stats():
 def api_state():
     with lock:
         return jsonify({"status": state["status"], "error": state["error"],
-                        "game": time.time() - state["game_seen"] < 3, "started": state["started"],
+                        "game": time.time() - state["game_seen"] < 3, "started": state["started"], "paused": state["paused"],
                         "cfg": cfg, "actions": ACTIONS, "log": list(log)[:60]})
 
 
@@ -377,8 +377,15 @@ def api_command():
     d = request.get_json(force=True)
     c = d.get("cmd")
     if c == "start":
-        state["started"] = True
+        state.update(started=True, paused=False)
         push({"type": "reset"}, "▶ Start")
+    elif c == "pause":  # pausar / reanudar la partida tal cual está
+        state["paused"] = not state.get("paused") and state["started"]
+        msg = "⏸ Pausa" if state["paused"] else "▶ Reanudado"
+        push({"type": "pause"}, msg)
+    elif c == "stop":  # volver a la pantalla de Start con una partida nueva
+        state.update(started=False, paused=False)
+        push({"type": "reset"}, "⏹ Vuelta al inicio")
     elif c == "lose":
         push({"type": "lose"}, "💀 Botón PERDER")
     elif c == "reset":

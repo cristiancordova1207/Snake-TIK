@@ -42,7 +42,7 @@ const R = SnakeRender.create(document.getElementById('c'), { sfx: SFX, i18n: I18
   onLayout: (layout) => fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ layout }) }) });
 document.addEventListener('pointerdown', () => SFX.unlock());
 
-let since = -1;
+let since = -1, lastPause;
 async function poll() {
   try {
     const r = await fetch('/api/poll?since=' + since).then((x) => x.json());
@@ -56,7 +56,9 @@ async function poll() {
       else if (e.type === 'stats') { R.game.wins = e.wins; R.game.losses = e.losses; }
     }
     if (r.locked !== undefined) R.setLocked(r.locked);
-    R.setPaused(r.started ? false : I18N.t('pressStart')); // no empieza hasta pulsar Start en el panel
+    // no empieza hasta pulsar Start en el panel; con Pausa se congela tal cual
+    const pz = !r.started ? I18N.t('pressStart') : r.paused ? I18N.t('pausedMsg') : false;
+    if (pz !== lastPause) { lastPause = pz; R.setPaused(pz); } // solo al cambiar (cada llamada reinicia el reloj de fotogramas)
   } catch { /* el programa se cerró: el juego sigue */ }
   setTimeout(poll, 250);
 }
