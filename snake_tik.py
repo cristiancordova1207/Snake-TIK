@@ -24,7 +24,7 @@ from TikTokLive.events import (ConnectEvent, DisconnectEvent, GiftEvent,
 
 from account import Account, xcrypt
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 PORT = 5010
 
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -38,7 +38,7 @@ ACTIONS = {
     "bombs":   {"name": "bombs", "emoji": "💣"},
     "airdrop": {"name": "airdropAct", "emoji": "✈️"},
 }
-LIVE_SETTINGS = ("speed", "grid", "toasts", "stats", "board", "animal", "color", "speedup", "countdown", "lang", "sound", "discord", "nolose")
+LIVE_SETTINGS = ("speed", "grid", "toasts", "stats", "board", "animal", "color", "speedup", "countdown", "lang", "sound", "discord", "nolose", "notitle", "layout")
 
 # Igual que en el vídeo de referencia
 DEFAULT_CFG = {
@@ -54,6 +54,8 @@ DEFAULT_CFG = {
     "speedup": False,      # más rápida cuanto más crece
     "countdown": 10,       # segundos al 100 % para ganar
     "nolose": False,       # la serpiente nunca pierde
+    "notitle": False,      # ocultar el título del juego
+    "layout": {},          # piezas movidas con el ratón: {"title": {"x": 0, "y": 0}, ...}
     "discord": "discord.gg/K6TCjKAyds",
     "stats": {"wins": 0, "losses": 0},
     "sound": {"master": 0.8, "keys": {"pack": "cherrymx-black-abs", "vol": 0.8, "on": True}, "events": {}},

@@ -37,7 +37,9 @@ if (!window.SnakeRender || !window.SnakeCore) {
   }, 2000);
   throw new Error('sin licencia');
 }
-const R = SnakeRender.create(document.getElementById('c'), { sfx: SFX, i18n: I18N });
+const R = SnakeRender.create(document.getElementById('c'), { sfx: SFX, i18n: I18N, draggable: true,
+  // arrastrar el título, el marcador, el tablero, Discord… con el ratón: se guarda en el programa
+  onLayout: (layout) => fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ layout }) }) });
 document.addEventListener('pointerdown', () => SFX.unlock());
 
 let since = -1;

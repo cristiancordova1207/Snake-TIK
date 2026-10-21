@@ -162,6 +162,7 @@ function renderLook() {
   $('#grids').innerHTML = [10, 12, 14, 16, 18, 20, 22, 24, 26].map((n) => `<button class="${c.grid === n ? 'on' : ''}" data-grid="${n}">${n}×${n}</button>`).join('');
   $('#speed').value = c.speed; $('#speedV').textContent = c.speed;
   $('#speedup').classList.toggle('on', !!c.speedup); $('#toasts').classList.toggle('on', !!c.toasts);
+  $('#showTitle').classList.toggle('on', !c.notitle);
   $('#countdown').value = c.countdown; $('#wins').value = c.stats.wins; $('#losses').value = c.stats.losses;
 }
 $('#v-look').addEventListener('click', (e) => {
@@ -172,6 +173,8 @@ $('#v-look').addEventListener('click', (e) => {
   if (b.dataset.grid) save({ grid: +b.dataset.grid }).then(renderLook);
   if (b.id === 'speedup') save({ speedup: !S.cfg.speedup }).then(renderLook);
   if (b.id === 'toasts') save({ toasts: !S.cfg.toasts }).then(renderLook);
+  if (b.id === 'showTitle') save({ notitle: !S.cfg.notitle }).then(renderLook);
+  if (b.id === 'resetLayout') save({ layout: {} }).then(() => toast('↺ ' + t('resetLayout')));
 });
 $('#v-look').addEventListener('change', (e) => {
   const x = e.target;

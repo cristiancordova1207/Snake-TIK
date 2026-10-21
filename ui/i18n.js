@@ -18,6 +18,9 @@
     pressStart: { es: 'Pulsa Start en el panel', en: 'Press Start in the panel', pt: 'Aperte Start no painel', fr: 'Appuie sur Start dans le panneau', de: 'Drücke Start im Panel', it: 'Premi Start nel pannello' },
     // ---- panel ----
     resetStats: { es: 'Reiniciar partidas y muertes', en: 'Reset wins & deaths', pt: 'Zerar vitórias e mortes', fr: 'Remettre victoires et morts à 0', de: 'Siege & Tode zurücksetzen', it: 'Azzera vittorie e morti' },
+    showTitle: { es: 'Mostrar el título del juego', en: 'Show game title', pt: 'Mostrar o título do jogo', fr: 'Afficher le titre du jeu', de: 'Spieltitel anzeigen', it: 'Mostra il titolo del gioco' },
+    dragHint: { es: 'Arrastra cualquier parte en la ventana del juego para moverla', en: 'Drag any part in the game window to move it', pt: 'Arraste qualquer parte na janela do jogo para movê-la', fr: 'Fais glisser une partie dans la fenêtre du jeu pour la déplacer', de: 'Ziehe Teile im Spielfenster, um sie zu verschieben', it: 'Trascina qualsiasi parte nella finestra di gioco per spostarla' },
+    resetLayout: { es: 'Restablecer posiciones', en: 'Reset positions', pt: 'Redefinir posições', fr: 'Réinitialiser les positions', de: 'Positionen zurücksetzen', it: 'Ripristina posizioni' },
     noLose: { es: 'La serpiente nunca pierde', en: 'Snake never loses', pt: 'A cobra nunca perde', fr: 'Le serpent ne perd jamais', de: 'Schlange verliert nie', it: 'Il serpente non perde mai' },
     tabPlay: { es: 'Jugar', en: 'Play', pt: 'Jogar', fr: 'Jouer', de: 'Spielen', it: 'Gioca' },
     tabGifts: { es: 'Regalos', en: 'Gifts', pt: 'Presentes', fr: 'Cadeaux', de: 'Geschenke', it: 'Regali' },

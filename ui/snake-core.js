@@ -40,17 +40,31 @@
     isFull() { return this.bombs.size === 0 && this.snake.length + this.filled.size >= this.total; }
 
     // rescate anti-bucle: los huecos a los que ya no puede llegar (con o sin manzana) se rellenan solos
+    // Antes del 80 % solo se rellenan huecos pequeños (≤ 3 casillas): una zona grande solo está tapada
+    // un rato por el cuerpo y rellenarla deja bloques fijos en el tablero.
     absorbHoles() {
       const tail = this.snake[this.snake.length - 1];
       const reach = this.bfs(this.snake[0], (i) => (this.grid[i] === BODY && i !== tail) || this.filled.has(i)).dist;
+      const maxComp = this.progress() >= 0.8 ? Infinity : 3;
       let n = 0;
-      for (let i = 0; i < this.total; i++) {
-        if (this.grid[i] === BODY || reach[i] >= 0) continue;
-        this.apples.delete(i); this.bombs.delete(i);
-        this.grid[i] = BODY;
-        this.filled.add(i);
-        this.events.push({ type: 'absorb', cell: i });
-        n++;
+      const seen = new Uint8Array(this.total);
+      for (let s0 = 0; s0 < this.total; s0++) {
+        if (seen[s0] || this.grid[s0] === BODY || reach[s0] >= 0) continue;
+        const comp = [s0]; seen[s0] = 1;
+        for (let k = 0; k < comp.length; k++) {
+          for (let d = 0; d < 4; d++) {
+            const nb = this.neighbor(comp[k], d);
+            if (nb >= 0 && !seen[nb] && this.grid[nb] !== BODY && reach[nb] < 0) { seen[nb] = 1; comp.push(nb); }
+          }
+        }
+        if (comp.length > maxComp) continue;
+        for (const i of comp) {
+          this.apples.delete(i); this.bombs.delete(i);
+          this.grid[i] = BODY;
+          this.filled.add(i);
+          this.events.push({ type: 'absorb', cell: i });
+          n++;
+        }
       }
       return n;
     }
@@ -415,8 +429,19 @@
       return k;
     }
 
-    // corta la mitad de la cola (y los huecos rellenados) para que vuelva a haber salida
+    // sin salida: si la cabeza está encerrada por su propio cuello, se da la vuelta (la cola pasa a ser la cabeza);
+    // si no, corta la mitad de la cola (y los huecos rellenados) para que vuelva a haber salida
     _rescueCut() {
+      const rev = this.snake.slice().reverse();
+      const head = rev[0];
+      for (let d = 0; d < 4; d++) {
+        const nb = this.neighbor(head, d);
+        if (nb >= 0 && this.grid[nb] !== BODY) {
+          this.snake = rev; this.grow = 0; this.plan = null;
+          this.events.push({ type: 'reverse' });
+          return true;
+        }
+      }
       if (this.snake.length <= 2 && !this.filled.size) return false;
       for (const c of this.filled) { this.grid[c] = FREE; this.events.push({ type: 'blast', cell: c }); }
       this.filled.clear();
@@ -465,6 +490,7 @@
 
     spawnTick(max = 3) {
       if (this.state !== 'play') return;
+      let reach = null;
       for (let k = 0; k < max; k++) {
         if (this.queueBombs > 0) {
           const [hx, hy] = this.xy(this.snake[0]);
@@ -474,7 +500,11 @@
           this.queueBombs--;
           if (c >= 0) { this.bombs.add(c); this.grid[c] = BOMB; this.events.push({ type: 'bomb', cell: c }); }
         } else if (this.queueGold > 0 || this.queueApples > 0) {
-          const c = this.randomFree();
+          // en una casilla a la que pueda llegar ya: si cae en una zona tapada por el cuerpo se atasca
+          // y el rescate acabaría rellenando esa zona con bloques
+          if (!reach) { const tail = this.snake[this.snake.length - 1]; reach = this.bfs(this.snake[0], (i) => (this.grid[i] === BODY && i !== tail) || this.filled.has(i)).dist; }
+          let c = this.randomFree((i) => reach[i] >= 0);
+          if (c < 0) c = this.randomFree();
           if (c < 0) break;
           const gold = this.queueGold > 0;
           if (gold) this.queueGold--; else this.queueApples--;
