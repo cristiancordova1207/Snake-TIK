@@ -386,8 +386,9 @@ async function discord(method: string, path: string, body?: unknown) {
 // el mismo panel que publica /ticket-panel desde el bot
 function ticketPanel() {
   return {
-    embeds: [{ title: '🎫 Tickets', color: 0x8b5cf6,
-      description: 'Press **Create ticket** to buy a product, get support or request a free trial.\nPulsa **Create ticket** para comprar un producto, pedir ayuda o solicitar una prueba gratuita.' }],
+    embeds: [{ title: 'TICKET', color: 0x2ecc71,
+      description: 'To create a ticket, use the Create Ticket button\nPara crear un ticket, utilice el botón Create Ticket',
+      footer: { text: 'Coreus Ticket · Compras · Support · Pruebas' } }],
     components: [{ type: 1, components: [{ type: 2, style: 3, label: 'Create ticket', emoji: { name: '📩' }, custom_id: 'tk_open' }] }],
   };
 }

@@ -60,8 +60,9 @@ const row = (...components: unknown[]) => ({ type: 1, components });
 
 export function ticketPanel() {
   return {
-    embeds: [{ title: '🎫 Tickets', color: 0x8b5cf6,
-      description: 'Press **Create ticket** to buy a product, get support or request a free trial.\nPulsa **Create ticket** para comprar un producto, pedir ayuda o solicitar una prueba gratuita.' }],
+    embeds: [{ title: 'TICKET', color: 0x2ecc71,
+      description: 'To create a ticket, use the Create Ticket button\nPara crear un ticket, utilice el botón Create Ticket',
+      footer: { text: 'Coreus Ticket · Compras · Support · Pruebas' } }],
     components: [row(btn('tk_open', 'Create ticket', '📩', 3))],
   };
 }
