@@ -21,8 +21,8 @@
     croc: { color: '#4f9a3a', kind: 'pipe', scales: true, snout: true, width: 0.94 },
     dragon: { color: '#e5484d', kind: 'pipe', spikes: true, horns: true },
     neon: { color: '#22d3ee', kind: 'pipe', glow: true },
-    worm: { color: '#f49ac1', kind: 'seg', rings: true },
-    caterpillar: { color: '#7bd34a', kind: 'seg', legs: true, antennae: true },
+    worm: { color: '#f49ac1', kind: 'pipe', rings: true, width: 0.8, noTongue: true },
+    caterpillar: { color: '#7bd34a', kind: 'pipe', legs: true, antennae: true, width: 0.92, noTongue: true },
   };
 
   function mix(hex, to, a) {
@@ -80,7 +80,7 @@
     function snd(ev, gap = 60) { const t = performance.now(); if (t - (lastSnd[ev] || 0) < gap) return; lastSnd[ev] = t; SFX.play(ev); }
     function newGame(n) {
       const st = { w: game.wins, l: game.losses };
-      game = new SnakeCore.Game(n); game.wins = st.w; game.losses = st.l; game.stallSteps = 15 * S.speed;
+      game = new SnakeCore.Game(n); game.wins = st.w; game.losses = st.l; game.stallSteps = 15 * S.speed; game.noLose = !!S.nolose;
       prevSnake = game.snake.slice(); born.clear(); fullT0 = 0;
     }
     function applySettings(s, first) {
@@ -90,7 +90,7 @@
       if (s.sound) SFX.configure(s.sound);
       if (first || gridChanged) newGame(S.grid);
       if (first && S.stats) { game.wins = S.stats.wins; game.losses = S.stats.losses; }
-      game.stallSteps = 15 * S.speed;
+      game.stallSteps = 15 * S.speed; game.noLose = !!S.nolose;
     }
 
     // ---------- utilidades ----------
@@ -248,57 +248,86 @@
       pts.push(grew || prev.length < 2 ? lastP : lerp(lastP, cellC(prev[prev.length - 2]), alpha));
       return pts;
     }
-    // animales de segmentos: cada bolita avanza en línea recta de su casilla a la siguiente
-    function segPoints(alpha) {
-      const cur = game.snake, prev = prevSnake.length ? prevSnake : cur, pts = [];
-      for (let i = 0; i < cur.length; i++) {
-        const a = cellC(cur[i]), b = cellC(prev[Math.min(i, prev.length - 1)]);
-        pts.push([b[0] + (a[0] - b[0]) * alpha, b[1] + (a[1] - b[1]) * alpha]);
+    // recorre el trazo por distancia: los adornos van a distancia fija de la cabeza y se deslizan suaves con el cuerpo
+    function walker(raw) {
+      const pts = raw.filter((q, i) => !i || q[0] !== raw[i - 1][0] || q[1] !== raw[i - 1][1]);
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      const L = cum[cum.length - 1];
+      function at(d) {
+        if (pts.length < 2) return { x: pts[0][0], y: pts[0][1], a: 0 };
+        d = Math.max(0, Math.min(L, d));
+        let i = 1; while (i < pts.length - 1 && cum[i] < d) i++;
+        const k = (d - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1), [ax, ay] = pts[i - 1], [bx, by] = pts[i];
+        return { x: ax + (bx - ax) * k, y: ay + (by - ay) * k, a: Math.atan2(by - ay, bx - ax) };
       }
-      return pts;
+      return { pts, cum, L, at };
     }
 
     function drawSnake(t, s, alpha) {
+      if (game.vanished) return; // se la comió la última bomba: desaparece
       const { A, p } = animalPalette();
-      const dead = game.state === 'lose', won = game.state === 'win';
+      const won = game.state === 'win';
       if (won) { const h = (t / 8) % 360; p.main = `hsl(${h},80%,62%)`; p.light = `hsl(${h},90%,78%)`; p.line = `hsl(${h},70%,45%)`; }
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      if (A.kind === 'seg') {
-        const pts = segPoints(alpha);
-        for (let i = pts.length - 1; i >= 1; i--) {
-          const [x, y] = pts[i], r = s * (0.42 - 0.08 * (i / pts.length));
-          ctx.fillStyle = 'rgba(0,30,0,.2)'; ctx.beginPath(); ctx.arc(x, y + s * 0.1, r, 0, 7); ctx.fill();
-          ctx.fillStyle = p.dark; ctx.beginPath(); ctx.arc(x, y, r + s * 0.05, 0, 7); ctx.fill();
-          ctx.fillStyle = A.legs && i % 2 ? p.light : p.main; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
-          if (A.rings) { ctx.strokeStyle = p.line; ctx.lineWidth = s * 0.05; ctx.beginPath(); ctx.arc(x, y, r * 0.6, 0, 7); ctx.stroke(); }
-          if (A.legs && i % 2 === 0) { ctx.fillStyle = p.dark; ctx.fillRect(x - r * 0.9, y + r * 0.6, r * 0.25, r * 0.4); ctx.fillRect(x + r * 0.65, y + r * 0.6, r * 0.25, r * 0.4); }
+      const Wk = walker(pipePoints(alpha));
+      // la cola acaba en pico: el último tramo se estrecha hasta 0
+      const taper = Math.min(s * 1.5, Wk.L * 0.6), split = Wk.L - taper;
+      const body = [];
+      for (let i = 0; i < Wk.pts.length && Wk.cum[i] < split; i++) body.push(Wk.pts[i]);
+      const sp = Wk.at(split); body.push([sp.x, sp.y]);
+      const ds = [split, Wk.L];
+      for (let k = 1; k < 20; k++) ds.push(split + taper * k / 20);
+      for (const c of Wk.cum) if (c > split && c < Wk.L) ds.push(c); // las esquinas también, para no cortar en diagonal
+      ds.sort((x, y) => x - y);
+      const tip = ds.map((d) => { const q = Wk.at(d); return [q.x, q.y, 1 - (d - split) / (taper || 1)]; });
+      function layer(w, color, dy = 0) {
+        ctx.save(); ctx.translate(0, dy); ctx.strokeStyle = color; ctx.lineJoin = 'round';
+        ctx.lineCap = 'butt'; ctx.lineWidth = w; ctx.beginPath();
+        body.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+        ctx.lineCap = 'round';
+        for (let k = 0; k < tip.length - 1; k++) {
+          ctx.lineWidth = Math.max(0.5, w * tip[k + 1][2]);
+          ctx.beginPath(); ctx.moveTo(tip[k][0], tip[k][1]); ctx.lineTo(tip[k + 1][0], tip[k + 1][1]); ctx.stroke();
         }
-        drawHead(pts[0], t, s, dead, p, A);
-        return;
+        ctx.restore();
       }
-      const pts = pipePoints(alpha);
-      const path = () => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); };
-      const wmul = A.width || 0.9;
-      ctx.save(); ctx.translate(0, s * 0.12); path(); ctx.lineWidth = s * wmul; ctx.strokeStyle = 'rgba(0,30,0,.25)'; ctx.stroke(); ctx.restore();
-      if (A.glow) { ctx.save(); ctx.shadowColor = p.main; ctx.shadowBlur = 30; path(); ctx.lineWidth = s * 0.7; ctx.strokeStyle = p.main; ctx.stroke(); ctx.restore(); }
-      path(); ctx.lineWidth = s * wmul; ctx.strokeStyle = p.dark; ctx.stroke();
-      path(); ctx.lineWidth = s * (wmul - 0.16); ctx.strokeStyle = p.main; ctx.stroke();
-      path(); ctx.lineWidth = s * 0.36; ctx.strokeStyle = p.light; ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1;
-      path(); ctx.lineWidth = s * 0.1; ctx.strokeStyle = p.line; ctx.stroke();
-      if (A.scales || A.spikes) {
-        for (let i = 2; i < pts.length - 1; i++) {
-          const [x, y] = pts[i];
-          if (A.scales) { ctx.fillStyle = p.dark; ctx.beginPath(); ctx.arc(x, y, s * 0.09, 0, 7); ctx.fill(); }
-          if (A.spikes && i % 2 === 0) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.moveTo(x - s * 0.12, y + s * 0.05); ctx.lineTo(x, y - s * 0.22); ctx.lineTo(x + s * 0.12, y + s * 0.05); ctx.fill(); }
+      const wmul = A.width || 0.9, half = s * wmul / 2;
+      const across = (d, len, w, color) => { // raya perpendicular al cuerpo
+        const q = Wk.at(d), nx = -Math.sin(q.a), ny = Math.cos(q.a);
+        ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(q.x - nx * len, q.y - ny * len); ctx.lineTo(q.x + nx * len, q.y + ny * len); ctx.stroke();
+      };
+      layer(s * wmul, 'rgba(0,30,0,.25)', s * 0.12);
+      if (A.legs) for (let d = s * 0.6; d < split; d += s * 0.5) across(d, half + s * 0.07, s * 0.1, p.dark); // patitas
+      if (A.glow) { ctx.save(); ctx.shadowColor = p.main; ctx.shadowBlur = 30; layer(s * 0.7, p.main); ctx.restore(); }
+      layer(s * wmul, p.dark);
+      layer(s * (wmul - 0.16), p.main);
+      if (A.rings) { // gusano: brillo por el centro y anillos suaves
+        layer(s * 0.22, 'rgba(255,255,255,.35)');
+        for (let d = s * 0.55; d < split; d += s * 0.45) across(d, half - s * 0.1, s * 0.04, 'rgba(120,30,70,.22)');
+      } else if (A.legs) { // oruga: franjas de colores
+        for (let d = s * 0.6; d < split; d += s * 0.5) { across(d, half - s * 0.1, s * 0.16, p.light); across(d + s * 0.13, half - s * 0.12, s * 0.05, p.dark); }
+      } else {
+        layer(s * 0.36, p.light);
+        layer(s * 0.1, p.line);
+      }
+      if (A.scales) for (let d = s * 0.7; d < split; d += s * 0.45) { const q = Wk.at(d); ctx.fillStyle = p.dark; ctx.beginPath(); ctx.arc(q.x, q.y, s * 0.09, 0, 7); ctx.fill(); }
+      if (A.spikes) { // dragón: placas en el lomo que se deslizan con el cuerpo (sin parpadeo)
+        for (let d = s * 0.75; d < split + taper * 0.5; d += s * 0.5) {
+          const q = Wk.at(d), k = d < split ? 1 : 1 - (d - split) / taper, r = s * 0.17 * k;
+          ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.a);
+          ctx.beginPath(); ctx.moveTo(-r * 1.1, 0); ctx.lineTo(0, -r * 0.75); ctx.lineTo(r * 1.5, 0); ctx.lineTo(0, r * 0.75); ctx.closePath();
+          ctx.fillStyle = '#f4a259'; ctx.fill(); ctx.lineWidth = s * 0.03; ctx.strokeStyle = p.dark; ctx.stroke();
+          ctx.restore();
         }
       }
-      drawHead(pts[0], t, s, dead, p, A);
+      drawHead(Wk.pts[0], t, s, game.state === 'lose', p, A);
     }
 
     function drawHead([hx, hy], t, s, dead, p, A) {
       const ang = [0, Math.PI, Math.PI / 2, -Math.PI / 2][game.dir];
       ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang);
-      if (!dead && !A.snout && Math.sin(t / 140) > 0.3) {
+      if (!dead && !A.snout && !A.noTongue && Math.sin(t / 140) > 0.3) {
         ctx.strokeStyle = '#ff3b6b'; ctx.lineWidth = s * 0.07; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(s * 0.45, 0); ctx.lineTo(s * 0.72, 0); ctx.lineTo(s * 0.84, -s * 0.08); ctx.moveTo(s * 0.72, 0); ctx.lineTo(s * 0.84, s * 0.08); ctx.stroke();
       }
@@ -311,7 +340,7 @@
         for (let k = 0; k < 4; k++) for (const side of [-1, 1]) { const x = s * (0.2 + k * 0.15); ctx.beginPath(); ctx.moveTo(x, side * s * 0.3); ctx.lineTo(x + s * 0.06, side * s * 0.18); ctx.lineTo(x + s * 0.12, side * s * 0.3); ctx.fill(); }
         ctx.fillStyle = p.dark; for (const side of [-1, 1]) { ctx.beginPath(); ctx.arc(s * 0.68, side * s * 0.1, s * 0.035, 0, 7); ctx.fill(); }
       }
-      if (A.horns) { ctx.fillStyle = '#ffd23f'; for (const side of [-1, 1]) { ctx.beginPath(); ctx.moveTo(-s * 0.2, side * s * 0.3); ctx.lineTo(-s * 0.5, side * s * 0.62); ctx.lineTo(-s * 0.02, side * s * 0.42); ctx.fill(); } }
+      if (A.horns) { ctx.fillStyle = '#f4a259'; for (const side of [-1, 1]) { ctx.beginPath(); ctx.moveTo(-s * 0.2, side * s * 0.3); ctx.lineTo(-s * 0.5, side * s * 0.62); ctx.lineTo(-s * 0.02, side * s * 0.42); ctx.fill(); } }
       if (A.antennae) { ctx.strokeStyle = p.dark; ctx.lineWidth = s * 0.05; for (const side of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 0.1, side * s * 0.3); ctx.lineTo(s * 0.35, side * s * 0.62); ctx.stroke(); ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(s * 0.35, side * s * 0.62, s * 0.07, 0, 7); ctx.fill(); } }
       const blink = !dead && (t % 3200) < 140;
       for (const side of [-1, 1]) {
@@ -468,6 +497,10 @@
         else if (e.type === 'eat') {
           const [x, y] = cellC(e.cell); burst(x, y, e.value > 1 ? '#ffd23f' : '#ff5a5a', 10, 7, 9);
           floatText(x, y - 20, `+${e.value}`, e.value > 1 ? '#ffe680' : '#ffffff'); snd(e.value > 1 ? 'gold' : 'eat', 40);
+        } else if (e.type === 'bombEat') {
+          const [x, y] = cellC(e.cell); born.delete(e.cell); burst(x, y, '#ffb020', 14, 9, 10); burst(x, y, '#555', 8, 6, 12);
+          floatText(x, y - 20, '-1', '#ff8a8a'); shake = Math.max(shake, 10); snd('blast', 120);
+          if (e.cut !== null && prevSnake.length > 1) prevSnake.pop();
         } else if (e.type === 'turn') { game._turnT = t; SFX.key(DIR_NAMES[e.dir]); }
         else if (e.type === 'rescue') {
           const [x, y] = cellC(e.cell); born.set(e.cell, e.from >= 0 ? { t, fx: cellC(e.from)[0], fy: cellC(e.from)[1] } : { t });
@@ -518,6 +551,11 @@
       drawBackground(t); drawHeader(t); drawBoard(t, alpha); drawToasts(t); drawFooter(); drawBanner(t); drawParticles(false);
       ctx.restore();
       if (locked) drawLocked();
+      else if (typeof paused === 'string') { // esperando a que pulsen Start en el panel
+        ctx.fillStyle = 'rgba(10,5,25,.55)'; ctx.fillRect(0, 0, W, H);
+        text('▶', W / 2, H / 2 - 60, 150, '#7be04a', { stroke: 14 });
+        text(paused, W / 2, H / 2 + 90, 52, '#fff', { font: FONT, weight: 800, stroke: 10 });
+      }
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
@@ -532,7 +570,7 @@
       fail() { game.scheduleFail(Math.round(5 * currentSpeed())); },
       reset() { game.reset(); game.stallSteps = 15 * S.speed; prevSnake = game.snake.slice(); born.clear(); banner = null; airdrops.length = 0; fullT0 = 0; },
       setLocked(v) { locked = v; },
-      setPaused(v) { paused = !!v; last = performance.now(); },
+      setPaused(v) { paused = typeof v === 'string' ? v : !!v; last = performance.now(); }, // texto = pausa con aviso en pantalla
       get game() { return game; },
       BOARDS, ANIMALS,
     };

@@ -1,7 +1,8 @@
 // Snake Tik · núcleo del juego + IA. Sin DOM: lo usan game.html y test_ai.js (node).
 // IA: va a la manzana más cercana SOLO si, tras comérsela, aún puede alcanzar su cola.
 // Si no, persigue su cola por el camino más largo (así nunca se encierra).
-// Las bombas nunca se colocan donde partirían el tablero en dos ni delante de la cabeza.
+// Bombas: se comen y restan 1 (como la manzana suma 1). Si la serpiente llega a 0, pierde.
+// El mapa completo incluye las casillas de bombas: hay que comérselas para llegar al 100 %.
 (function (root) {
   'use strict';
   const FREE = 0, BODY = 1, BOMB = 2;
@@ -15,6 +16,7 @@
 
     reset() {
       const n = this.n, c = Math.floor(n / 2);
+      const keepBombs = this.queueBombs || 0;   // las bombas que no llegaron a caer pasan a la siguiente partida
       this.grid = new Uint8Array(this.total);
       this.snake = [];                      // índices, cabeza primero
       for (let i = 0; i < 4; i++) this.snake.push(this.idx(c - i, c));
@@ -23,7 +25,8 @@
       this.bombs = new Set();
       this.grow = 0;
       this.dir = 0;                         // 0 der, 1 izq, 2 abajo, 3 arriba
-      this.queueApples = 0; this.queueGold = 0; this.queueBombs = 0;
+      this.queueApples = 0; this.queueGold = 0; this.queueBombs = keepBombs;
+      this.vanished = false;
       this.state = 'play';                  // play | win | lose
       this.steps = 0; this.lastEat = 0;
       this.failAt = 0;                      // botón PERDER: paso en el que se equivoca a propósito
@@ -34,16 +37,16 @@
     }
 
     // el tablero está completo: lo usa la cuenta atrás de victoria
-    isFull() { return this.snake.length + this.filled.size >= this.freeCells(); }
+    isFull() { return this.bombs.size === 0 && this.snake.length + this.filled.size >= this.total; }
 
     // rescate anti-bucle: los huecos a los que ya no puede llegar (con o sin manzana) se rellenan solos
     absorbHoles() {
       const tail = this.snake[this.snake.length - 1];
-      const reach = this.bfs(this.snake[0], (i) => (this.grid[i] === BODY && i !== tail) || this.grid[i] === BOMB).dist;
+      const reach = this.bfs(this.snake[0], (i) => (this.grid[i] === BODY && i !== tail) || this.filled.has(i)).dist;
       let n = 0;
       for (let i = 0; i < this.total; i++) {
-        if (this.grid[i] !== FREE || reach[i] >= 0) continue;
-        this.apples.delete(i);
+        if (this.grid[i] === BODY || reach[i] >= 0) continue;
+        this.apples.delete(i); this.bombs.delete(i);
         this.grid[i] = BODY;
         this.filled.add(i);
         this.events.push({ type: 'absorb', cell: i });
@@ -67,9 +70,18 @@
       if (d === 2) return y + 1 < n ? i + n : -1;
       return y > 0 ? i - n : -1;
     }
-    freeCells() { return this.total - this.bombs.size; }
-    wall(i) { return this.bombs.has(i) || this.filled.has(i); }
-    progress() { return (this.snake.length + this.filled.size) / Math.max(1, this.freeCells()); }
+    freeCells() { return this.total; }
+    wall(i) { return this.filled.has(i); }
+    progress() { return (this.snake.length + this.filled.size) / this.total; }
+    // ¿puede pisar bombas? Muy corta se moriría; con "nunca pierde" no baja de 2
+    bombOk(len) { return this.noLose || len > 3; }
+    // comer una bomba sobre un cuerpo: -1 (primero gasta crecimiento pendiente). Devuelve si muere.
+    bombHit(body, grow) {
+      if (grow > 0) return { grow: grow - 1, dead: false, cut: null };
+      if (this.noLose && body.length <= 2) return { grow, dead: false, cut: null };
+      if (body.length <= 1) return { grow, dead: true, cut: null };
+      return { grow, dead: false, cut: body.pop() };
+    }
 
     // ---------------- búsqueda ----------------
     // BFS desde `from` sobre celdas permitidas. blocked(i) -> true si no se puede pisar.
@@ -109,17 +121,20 @@
     simulate(path) {
       const body = this.snake.slice(); let grow = this.grow;
       const eaten = new Set();
+      let dead = false;
       for (const c of path) {
         body.unshift(c);
         if (this.apples.has(c) && !eaten.has(c)) { grow += this.apples.get(c); eaten.add(c); }
         if (grow > 0) grow--; else body.pop();
+        if (this.bombs.has(c) && !eaten.has(c)) { eaten.add(c); const r = this.bombHit(body, grow); grow = r.grow; dead = dead || r.dead; }
       }
-      return { body, grow, eaten };
+      return { body, grow, eaten, dead };
     }
 
     decide() {
       const head = this.snake[0], tail = this.snake[this.snake.length - 1];
-      const blockedNow = (i) => (this.grid[i] === BODY && !(i === tail && this.grow === 0)) || this.grid[i] === BOMB;
+      const bombsBlock = !this.bombOk(this.snake.length);
+      const blockedNow = (i) => (this.grid[i] === BODY && !(i === tail && this.grow === 0)) || this.filled.has(i) || (bombsBlock && this.grid[i] === BOMB);
 
       // botón PERDER: llegó el momento de "equivocarse" (se mete contra su cuerpo, una pared o una bomba)
       if (this.failAt && this.steps >= this.failAt) {
@@ -142,41 +157,25 @@
       }
       const stalled = this.steps - this.lastEat > this.freeCells();
 
-      // 1) manzanas por orden de cercanía, con prueba de seguridad
-      if (this.apples.size) {
+      // 1) manzanas por orden de cercanía (y bombas si no hay manzanas o está atascada: hay que limpiar el mapa)
+      const wantBombs = this.bombs.size > 0 && !bombsBlock && (this.apples.size === 0 || stalled);
+      if (this.apples.size || wantBombs) {
         const r = this.bfs(head, blockedNow);
         let tried = 0;
         for (let k = 1; k < r.order.length && tried < 8; k++) {
           const c = r.order[k];
-          if (!this.apples.has(c)) continue;
+          if (!this.apples.has(c) && !(wantBombs && this.bombs.has(c))) continue;
           tried++;
           const path = [];
           for (let p = c; p !== head; p = r.prev[p]) path.push(p);
           path.reverse();
           const sim = this.simulate(path);
-          if (this.tailReachable(sim.body, sim.grow)) return this.dirTo(head, path[0]);
+          if (!sim.dead && this.tailReachable(sim.body, sim.grow)) return this.dirTo(head, path[0]);
         }
         // atascado al final: busca una secuencia exacta que coma y termine segura
         if (stalled && (this.steps & 7) === 0) {
           const plan = this.searchPlan(30, Math.min(120, this.freeCells()));
           if (plan) { this.plan = plan; return this.plan.shift(); }
-        }
-      }
-
-      // bucle con bombas: si ni el rescate lo arregla (2 × stallSteps sin comer), va a por la bomba más cercana y se la come (pierde)
-      if (this.bombs.size && this.stallSteps && this.steps - this.lastEat > this.stallSteps * 2) {
-        const r = this.bfs(head, (i) => blockedNow(i) || this.filled.has(i));
-        let target = -1, bestD = Infinity; // casilla alcanzable con una bomba al lado
-        for (const c of r.order) {
-          if (r.dist[c] >= bestD) continue;
-          for (let d = 0; d < 4; d++) { const nb = this.neighbor(c, d); if (nb >= 0 && this.grid[nb] === BOMB) { bestD = r.dist[c]; target = c; break; } }
-        }
-        if (target === head) {
-          for (let d = 0; d < 4; d++) { const nb = this.neighbor(head, d); if (nb >= 0 && this.grid[nb] === BOMB) return d; }
-        } else if (target >= 0) {
-          let p = target;
-          while (r.prev[p] !== head) p = r.prev[p];
-          return this.dirTo(head, p);
         }
       }
 
@@ -189,9 +188,9 @@
           // solo quedan manzanas imposibles de comer sin encerrarse: se absorben también
           let empty = false;
           for (let i = 0; i < this.total && !empty; i++) if (this.grid[i] === FREE && !this.apples.has(i)) empty = true;
-          if (!empty && this.apples.size) {
-            for (const a of [...this.apples.keys()]) {
-              this.apples.delete(a); this.grid[a] = BODY; this.filled.add(a);
+          if (!empty && (this.apples.size || this.bombs.size)) {
+            for (const a of [...this.apples.keys(), ...this.bombs]) {
+              this.apples.delete(a); this.bombs.delete(a); this.grid[a] = BODY; this.filled.add(a);
               this.events.push({ type: 'absorb', cell: a });
             }
             this.lastEat = this.steps;
@@ -219,13 +218,14 @@
 
     chaseMove(stalled) {
       const head = this.snake[0], tail = this.snake[this.snake.length - 1];
-      const blockedNow = (i) => (this.grid[i] === BODY && !(i === tail && this.grow === 0)) || this.grid[i] === BOMB;
+      const bombsBlock = !this.bombOk(this.snake.length);
+      const blockedNow = (i) => (this.grid[i] === BODY && !(i === tail && this.grow === 0)) || this.filled.has(i) || (bombsBlock && this.grid[i] === BOMB);
       let best = -1, bestScore = -Infinity;
       for (let d = 0; d < 4; d++) {
         const nb = this.neighbor(head, d);
         if (nb < 0 || blockedNow(nb)) continue;
         const sim = this.simulate([nb]);
-        if (!this.tailReachable(sim.body, sim.grow)) continue;
+        if (sim.dead || !this.tailReachable(sim.body, sim.grow)) continue;
         const st = sim.body[sim.body.length - 1];
         const occ = new Uint8Array(this.total);
         for (let k = 0; k < sim.body.length - 1; k++) occ[sim.body[k]] = 1;
@@ -247,7 +247,8 @@
     // 3) sin salida segura: la casilla con más espacio libre
     lastResort() {
       const head = this.snake[0], tail = this.snake[this.snake.length - 1];
-      const blockedNow = (i) => (this.grid[i] === BODY && !(i === tail && this.grow === 0)) || this.grid[i] === BOMB;
+      // emergencia: si no hay otra salida, se come la bomba (aunque le cueste la vida)
+      const blockedNow = (i) => (this.grid[i] === BODY && !(i === tail && this.grow === 0)) || this.filled.has(i);
       let best = -1, bestArea = 0;
       for (let d = 0; d < 4; d++) {
         const nb = this.neighbor(head, d);
@@ -269,13 +270,20 @@
       if (st.apples.has(nb)) { st.grow += st.apples.get(nb); st.apples.delete(nb); st.ate = true; }
       if (st.grow > 0) st.grow--; else { st.occ[st.body.pop()] = 0; }
       st.body.unshift(nb); st.occ[nb] = 1;
+      if (st.bombs.has(nb)) {
+        st.bombs.delete(nb);
+        const r = this.bombHit(st.body, st.grow);
+        if (r.dead) return false;
+        st.grow = r.grow;
+        if (r.cut !== null) st.occ[r.cut] = 0;
+      }
       return true;
     }
 
     copyState() {
       const occ = new Uint8Array(this.total);
       for (const s of this.snake) occ[s] = 1;
-      return { body: this.snake.slice(), occ, grow: this.grow, apples: new Map(this.apples), ate: false };
+      return { body: this.snake.slice(), occ, grow: this.grow, apples: new Map(this.apples), bombs: new Set(this.bombs), ate: false };
     }
 
     // distancia de cada casilla a la manzana más cercana (una sola BFS desde todas las manzanas)
@@ -358,8 +366,10 @@
       const d = this.decide();
       const nb = d < 0 ? -1 : this.neighbor(this.snake[0], d);
       const tail = this.snake[this.snake.length - 1];
-      if (nb < 0 || this.grid[nb] === BOMB || (this.grid[nb] === BODY && !(nb === tail && this.grow === 0))) {
-        return this.lose(nb >= 0 && this.grid[nb] === BOMB ? 'bomb' : 'crash');
+      if (nb < 0 || (this.grid[nb] === BODY && !(nb === tail && this.grow === 0))) {
+        // red de seguridad: en vez de chocar, revienta media cola para tener salida (salvo si PERDER está activo)
+        if (!this.failAt && !this._rescued && this._rescueCut()) { this._rescued = true; this.steps--; this.step(); this._rescued = false; return; }
+        return this.lose('crash');
       }
       this.dir = d;
       // mismo orden que simulate(): comer primero, luego decidir si la cola avanza
@@ -370,7 +380,20 @@
       }
       if (this.grow > 0) this.grow--;
       else { this.grid[tail] = FREE; this.snake.pop(); }
-      this.snake.unshift(nb); this.grid[nb] = BODY;
+      this.snake.unshift(nb);
+      if (this.bombs.has(nb)) { // bomba: -1
+        this.bombs.delete(nb);
+        const r = this.bombHit(this.snake, this.grow);
+        this.grow = r.grow;
+        if (r.cut !== null) this.grid[r.cut] = FREE;
+        this.events.push({ type: 'bombEat', cell: nb, cut: r.cut });
+        if (r.dead) { // llegó a 0: desaparece
+          for (const c of this.snake) this.grid[c] = FREE;
+          this.vanished = true;
+          return this.lose('bomb');
+        }
+      }
+      this.grid[nb] = BODY;
       if (this.isFull()) this.grow = 0; // tablero lleno: ya no cabe crecer (si no, chocaría con su cola)
       if (d !== this.lastDir) this.events.push({ type: 'turn', dir: d });
       this.lastDir = d;
@@ -390,6 +413,18 @@
       this.grow = 0;
       this.plan = null;
       return k;
+    }
+
+    // corta la mitad de la cola (y los huecos rellenados) para que vuelva a haber salida
+    _rescueCut() {
+      if (this.snake.length <= 2 && !this.filled.size) return false;
+      for (const c of this.filled) { this.grid[c] = FREE; this.events.push({ type: 'blast', cell: c }); }
+      this.filled.clear();
+      const k = Math.floor(this.snake.length / 2);
+      for (let i = 0; i < k; i++) { const c = this.snake.pop(); this.grid[c] = FREE; this.events.push({ type: 'blast', cell: c }); }
+      this.grow = 0; this.plan = null;
+      this.events.push({ type: 'blasted', count: k });
+      return true;
     }
 
     // airdrop: suelta `k` manzanas en casillas libres al azar de la columna x
@@ -428,32 +463,14 @@
       return free.length ? free[(this.rng() * free.length) | 0] : -1;
     }
 
-    // ¿sigue conectado todo el espacio libre (y la cola) con la cabeza si ponemos una bomba en `c`?
-    bombIsFair(c) {
-      const [hx, hy] = this.xy(this.snake[0]), [cx, cy] = this.xy(c);
-      if (Math.abs(hx - cx) + Math.abs(hy - cy) <= 2) return false;
-      this.bombs.add(c);
-      const tail = this.snake[this.snake.length - 1];
-      const r = this.bfs(this.snake[0], (i) => (this.grid[i] === BODY && i !== tail) || this.wall(i));
-      this.bombs.delete(c);
-      if (r.dist[tail] < 0) return false; // nunca cortar el camino hacia la cola
-      let need = 0;
-      for (let i = 0; i < this.total; i++) if (this.grid[i] === FREE && i !== c) need++;
-      let got = 0;
-      for (const i of r.order) if (this.grid[i] === FREE) got++;
-      return got === need;
-    }
-
     spawnTick(max = 3) {
       if (this.state !== 'play') return;
       for (let k = 0; k < max; k++) {
         if (this.queueBombs > 0) {
-          let c = -1;
-          for (let tries = 0; tries < 25; tries++) {
-            const cand = this.randomFree();
-            if (cand < 0) break;
-            if (this.bombIsFair(cand)) { c = cand; break; }
-          }
+          const [hx, hy] = this.xy(this.snake[0]);
+          let c = this.randomFree((i) => { const [x, y] = this.xy(i); return Math.abs(x - hx) + Math.abs(y - hy) > 2; });
+          if (c < 0) c = this.randomFree();
+          if (c < 0) break; // sin sitio: esperan (y si no, pasan a la siguiente partida)
           this.queueBombs--;
           if (c >= 0) { this.bombs.add(c); this.grid[c] = BOMB; this.events.push({ type: 'bomb', cell: c }); }
         } else if (this.queueGold > 0 || this.queueApples > 0) {
@@ -473,7 +490,7 @@
       // siempre hay al menos una manzana en juego (en una casilla a la que pueda llegar)
       if (this.apples.size === 0 && this.queueApples === 0 && this.queueGold === 0 && !this.isFull()) {
         const tail = this.snake[this.snake.length - 1];
-        const reach = this.bfs(this.snake[0], (i) => (this.grid[i] === BODY && i !== tail) || this.grid[i] === BOMB).dist;
+        const reach = this.bfs(this.snake[0], (i) => (this.grid[i] === BODY && i !== tail) || this.filled.has(i)).dist;
         let c = this.randomFree((i) => reach[i] >= 0);
         if (c < 0) c = this.randomFree();
         if (c >= 0) {

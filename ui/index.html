@@ -48,9 +48,11 @@
         </div>
         <div class="card lose-card">
           <h3><span class="ic">🎛️</span>Control</h3>
+          <button class="btn btn-green btn-lg jelly" id="start" hidden>▶ Start</button>
           <button class="btn btn-danger jelly" id="lose">💀 <span data-i18n="loseBtn"></span></button>
           <p class="hint" data-i18n="loseHint"></p>
-          <div class="row" style="justify-content:center"><button class="btn btn-ghost btn-sm jelly" id="reset">🔄 <span data-i18n="reset"></span></button></div>
+          <div class="row" style="justify-content:center"><button class="btn btn-ghost btn-sm jelly" id="reset">🔄 <span data-i18n="reset"></span></button><button class="btn btn-ghost btn-sm jelly" id="resetStats">🏆💀 <span data-i18n="resetStats"></span></button></div>
+          <div class="set" style="margin-top:12px"><span>🛡️ <span data-i18n="noLose"></span></span><button class="toggle" id="nolose"></button></div>
           <h3 style="margin-top:18px"><span class="ic">🧪</span><span data-i18n="test"></span></h3>
           <div class="row" style="justify-content:center">
             <button class="btn btn-ghost btn-sm jelly" data-add="apples,5">+5 🍎</button>

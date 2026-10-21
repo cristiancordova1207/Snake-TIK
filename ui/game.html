@@ -51,8 +51,10 @@ async function poll() {
       if (e.type === 'add') R.gift(e.what, e.amount, e.nick, e.source);
       else if (e.type === 'lose') R.fail();
       else if (e.type === 'reset') R.reset();
+      else if (e.type === 'stats') { R.game.wins = e.wins; R.game.losses = e.losses; }
     }
     if (r.locked !== undefined) R.setLocked(r.locked);
+    R.setPaused(r.started ? false : I18N.t('pressStart')); // no empieza hasta pulsar Start en el panel
   } catch { /* el programa se cerró: el juego sigue */ }
   setTimeout(poll, 250);
 }

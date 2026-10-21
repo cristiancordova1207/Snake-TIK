@@ -111,6 +111,9 @@ $('#disconnect').onclick = () => api('/api/disconnect', {});
 $('#openGame').onclick = () => api('/api/open-game', {});
 $('#lose').onclick = () => { api('/api/command', { cmd: 'lose' }); toast('💀 ' + t('loseBtn') + '…'); };
 $('#reset').onclick = () => api('/api/command', { cmd: 'reset' });
+$('#start').onclick = () => { api('/api/command', { cmd: 'start' }); $('#start').hidden = true; };
+$('#resetStats').onclick = () => { save({ stats: { wins: 0, losses: 0 } }); toast('🏆 0 · 💀 0'); };
+$('#nolose').onclick = () => save({ nolose: !S.cfg.nolose }).then(() => $('#nolose').classList.toggle('on', !!S.cfg.nolose));
 $$('[data-add]').forEach((b) => b.onclick = () => { const [what, amount] = b.dataset.add.split(','); api('/api/command', { cmd: 'add', what, amount: +amount }); });
 
 // ---------------- regalos ----------------
@@ -262,6 +265,7 @@ $('#langSel').onchange = (e) => { save({ lang: e.target.value }); setLang(e.targ
 
 function renderAll() {
   if (!ACC || !ACC.logged) return;
+  $('#nolose').classList.toggle('on', !!S.cfg.nolose);
   renderTT(); renderRules(); renderLook(); renderSounds(); renderAccount();
 }
 async function poll() {
@@ -271,6 +275,8 @@ async function poll() {
     $('#dTT').className = 'dot ' + (st === 'live' ? 'on' : st === 'connecting' ? 'wait' : '');
     $('#sTT').textContent = st === 'live' ? t('live') : st === 'connecting' ? t('connecting') : t('offline');
     $('#dG').className = 'dot ' + (s.game ? 'on' : ''); $('#sG').textContent = s.game ? t('gameOpen') : t('gameClosed');
+    $('#start').hidden = !!s.started;
+    if (document.activeElement !== $('#wins') && document.activeElement !== $('#losses')) { $('#wins').value = s.cfg.stats.wins; $('#losses').value = s.cfg.stats.losses; }
     if (s.error) $('#ttErr').textContent = s.error.includes('no está en directo') ? t('err_offlineLive') : s.error;
     $('#log').innerHTML = s.log.map((l) => `<div><time>${new Date(l.t * 1000).toLocaleTimeString()}</time>${esc(l.text)}</div>`).join('') || '<div class="hint">—</div>';
     $('#playSub').textContent = ACC && ACC.profile && ACC.profile.role === 'trial' ? t('trialLeft', { m: Math.floor((ACC.profile.trialSeconds || 0) / 60) }) : '';

@@ -15,7 +15,10 @@
     incoming: { es: 'en camino', en: 'incoming', pt: 'chegando', fr: 'en route', de: 'unterwegs', it: 'in arrivo' },
     airdrop: { es: '¡AIRDROP!', en: 'AIRDROP!', pt: 'AIRDROP!', fr: 'LARGAGE !', de: 'AIRDROP!', it: 'AIRDROP!' },
     blasted: { es: '¡BOOM! Cola destruida', en: 'BOOM! Tail destroyed', pt: 'BOOM! Cauda destruída', fr: 'BOUM ! Queue détruite', de: 'BUMM! Schwanz zerstört', it: 'BOOM! Coda distrutta' },
+    pressStart: { es: 'Pulsa Start en el panel', en: 'Press Start in the panel', pt: 'Aperte Start no painel', fr: 'Appuie sur Start dans le panneau', de: 'Drücke Start im Panel', it: 'Premi Start nel pannello' },
     // ---- panel ----
+    resetStats: { es: 'Reiniciar partidas y muertes', en: 'Reset wins & deaths', pt: 'Zerar vitórias e mortes', fr: 'Remettre victoires et morts à 0', de: 'Siege & Tode zurücksetzen', it: 'Azzera vittorie e morti' },
+    noLose: { es: 'La serpiente nunca pierde', en: 'Snake never loses', pt: 'A cobra nunca perde', fr: 'Le serpent ne perd jamais', de: 'Schlange verliert nie', it: 'Il serpente non perde mai' },
     tabPlay: { es: 'Jugar', en: 'Play', pt: 'Jogar', fr: 'Jouer', de: 'Spielen', it: 'Gioca' },
     tabGifts: { es: 'Regalos', en: 'Gifts', pt: 'Presentes', fr: 'Cadeaux', de: 'Geschenke', it: 'Regali' },
     tabLook: { es: 'Apariencia', en: 'Appearance', pt: 'Aparência', fr: 'Apparence', de: 'Aussehen', it: 'Aspetto' },

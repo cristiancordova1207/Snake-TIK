@@ -24,7 +24,7 @@ from TikTokLive.events import (ConnectEvent, DisconnectEvent, GiftEvent,
 
 from account import Account, xcrypt
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 PORT = 5010
 
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -38,7 +38,7 @@ ACTIONS = {
     "bombs":   {"name": "bombs", "emoji": "💣"},
     "airdrop": {"name": "airdropAct", "emoji": "✈️"},
 }
-LIVE_SETTINGS = ("speed", "grid", "toasts", "stats", "board", "animal", "color", "speedup", "countdown", "lang", "sound", "discord")
+LIVE_SETTINGS = ("speed", "grid", "toasts", "stats", "board", "animal", "color", "speedup", "countdown", "lang", "sound", "discord", "nolose")
 
 # Igual que en el vídeo de referencia
 DEFAULT_CFG = {
@@ -53,6 +53,7 @@ DEFAULT_CFG = {
     "color": None,         # None = color propio del animal
     "speedup": False,      # más rápida cuanto más crece
     "countdown": 10,       # segundos al 100 % para ganar
+    "nolose": False,       # la serpiente nunca pierde
     "discord": "discord.gg/K6TCjKAyds",
     "stats": {"wins": 0, "losses": 0},
     "sound": {"master": 0.8, "keys": {"pack": "cherrymx-black-abs", "vol": 0.8, "on": True}, "events": {}},
@@ -72,7 +73,7 @@ events = deque(maxlen=2000)
 log = deque(maxlen=200)
 seq = 0
 gift_catalog = {}
-state = {"status": "off", "error": "", "game_seen": 0.0, "likes": {}, "fired": {}, "tiktok": ""}
+state = {"status": "off", "error": "", "game_seen": 0.0, "likes": {}, "fired": {}, "tiktok": "", "started": False}
 client_box = {"client": None, "loop": None}
 
 
@@ -277,7 +278,7 @@ def api_poll():
     settings = {k: cfg[k] for k in LIVE_SETTINGS}
     if ACC.profile and ACC.profile.get("discord") is not None:
         settings["discord"] = ACC.profile["discord"]  # el enlace lo decide el admin desde el servidor
-    return jsonify({"seq": cur, "events": out, "settings": settings, "locked": lock_reason() or False})
+    return jsonify({"seq": cur, "events": out, "settings": settings, "locked": lock_reason() or False, "started": state["started"]})
 
 
 @app.post("/api/stats")
@@ -292,7 +293,7 @@ def api_stats():
 def api_state():
     with lock:
         return jsonify({"status": state["status"], "error": state["error"],
-                        "game": time.time() - state["game_seen"] < 3,
+                        "game": time.time() - state["game_seen"] < 3, "started": state["started"],
                         "cfg": cfg, "actions": ACTIONS, "log": list(log)[:60]})
 
 
@@ -317,6 +318,8 @@ def api_config():
         if k in data and k != "discord":  # el enlace de Discord solo lo cambia el admin (ver /api/admin)
             cfg[k] = data[k]
     save_cfg()
+    if "stats" in data:  # el juego cambia sus contadores al momento (p. ej. botón de reiniciar)
+        push({"type": "stats", **cfg["stats"]})
     if any(k in data for k in LIVE_SETTINGS):
         push({"type": "settings"})
     return jsonify({"ok": True})
@@ -370,7 +373,10 @@ def api_command():
     """Botones del panel: perder, reiniciar, pruebas."""
     d = request.get_json(force=True)
     c = d.get("cmd")
-    if c == "lose":
+    if c == "start":
+        state["started"] = True
+        push({"type": "reset"}, "▶ Start")
+    elif c == "lose":
         push({"type": "lose"}, "💀 Botón PERDER")
     elif c == "reset":
         push({"type": "reset"}, "🔄 Partida reiniciada")
