@@ -10,7 +10,7 @@ const rng = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7ffffff
 const COUNTDOWN = 120;
 
 const GAMES = +process.argv[2] || 40;
-let wins = 0, losses = 0, stalls = 0, stepsTotal = 0, rescues = 0;
+let bombDeaths = 0, wins = 0, losses = 0, stalls = 0, stepsTotal = 0, rescues = 0;
 for (let g = 0; g < GAMES; g++) {
   const n = [10, 14, 20, 26][g % 4];
   const game = new Game(n, rng);
@@ -25,7 +25,7 @@ for (let g = 0; g < GAMES; g++) {
     const before = game.queueBombs;
     game.spawnTick(3);
     game.step();
-    for (const e of game.events) if (e.type === 'rescue') rescues++;
+    for (const e of game.events) { if (e.type === 'rescue') rescues++; if (e.type === 'lose' && e.reason === 'bomb') bombDeaths++; }
     game.events.length = 0;
     // cuenta atrás de victoria: se reinicia si llegan bombas o deja de estar lleno
     fullFor = game.isFull() && game.queueBombs === 0 && before === game.queueBombs ? fullFor + 1 : 0;
@@ -35,7 +35,7 @@ for (let g = 0; g < GAMES; g++) {
   if (game.state === 'win') wins++; else if (game.state === 'lose') losses++; else stalls++;
   stepsTotal += t;
 }
-console.log(`partidas=${GAMES} ganadas=${wins} perdidas=${losses} atascadas=${stalls} rescates=${rescues} pasos medios=${Math.round(stepsTotal / GAMES)}`);
+console.log(`partidas=${GAMES} ganadas=${wins} perdidas=${losses} (por bomba, válidas: ${bombDeaths}) atascadas=${stalls} rescates=${rescues} pasos medios=${Math.round(stepsTotal / GAMES)}`);
 
 // botón PERDER
 let failOk = 0;
@@ -48,4 +48,5 @@ for (let g = 0; g < 20; g++) {
   if (game.state === 'lose' && game.steps - at <= 120) failOk++;
 }
 console.log(`botón PERDER: ${failOk}/20 pierden a tiempo`);
-if (losses > 0 || stalls > 0 || failOk < 18) { console.error('FALLO'); process.exit(1); }
+// perder por bombas es la regla del juego (-1 por bomba); fallo = chocar o atascarse
+if (losses - bombDeaths > 0 || stalls > 0 || failOk < 18) { console.error('FALLO'); process.exit(1); }

@@ -80,7 +80,7 @@
     function snd(ev, gap = 60) { const t = performance.now(); if (t - (lastSnd[ev] || 0) < gap) return; lastSnd[ev] = t; SFX.play(ev); }
     function newGame(n) {
       const st = { w: game.wins, l: game.losses };
-      game = new SnakeCore.Game(n); game.wins = st.w; game.losses = st.l; game.stallSteps = 15 * S.speed; game.noLose = !!S.nolose;
+      game = new SnakeCore.Game(n); game.wins = st.w; game.losses = st.l; game.stallSteps = 15 * S.speed; game.noLose = !!S.nolose; game.fillHoles = !!S.fillholes;
       prevSnake = game.snake.slice(); born.clear(); fullT0 = 0;
     }
     function applySettings(s, first) {
@@ -91,7 +91,7 @@
       if (s.sound) SFX.configure(s.sound);
       if (first || gridChanged) newGame(S.grid);
       if (first && S.stats) { game.wins = S.stats.wins; game.losses = S.stats.losses; }
-      game.stallSteps = 15 * S.speed; game.noLose = !!S.nolose;
+      game.stallSteps = 15 * S.speed; game.noLose = !!S.nolose; game.fillHoles = !!S.fillholes;
     }
 
     // ---------- piezas movibles (arrastrar con el ratón en la ventana del juego) ----------

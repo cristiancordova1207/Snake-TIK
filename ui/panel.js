@@ -114,6 +114,7 @@ $('#reset').onclick = () => api('/api/command', { cmd: 'reset' });
 $('#start').onclick = () => { api('/api/command', { cmd: 'start' }); $('#start').hidden = true; };
 $('#resetStats').onclick = () => { save({ stats: { wins: 0, losses: 0 } }); toast('🏆 0 · 💀 0'); };
 $('#nolose').onclick = () => save({ nolose: !S.cfg.nolose }).then(() => $('#nolose').classList.toggle('on', !!S.cfg.nolose));
+$('#fillholes').onclick = () => save({ fillholes: !S.cfg.fillholes }).then(() => $('#fillholes').classList.toggle('on', !!S.cfg.fillholes));
 $$('[data-add]').forEach((b) => b.onclick = () => { const [what, amount] = b.dataset.add.split(','); api('/api/command', { cmd: 'add', what, amount: +amount }); });
 
 // ---------------- regalos ----------------
@@ -269,6 +270,7 @@ $('#langSel').onchange = (e) => { save({ lang: e.target.value }); setLang(e.targ
 function renderAll() {
   if (!ACC || !ACC.logged) return;
   $('#nolose').classList.toggle('on', !!S.cfg.nolose);
+  $('#fillholes').classList.toggle('on', !!S.cfg.fillholes);
   renderTT(); renderRules(); renderLook(); renderSounds(); renderAccount();
 }
 async function poll() {

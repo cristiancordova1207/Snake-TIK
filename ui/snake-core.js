@@ -31,13 +31,15 @@
       this.steps = 0; this.lastEat = 0;
       this.failAt = 0;                      // botón PERDER: paso en el que se equivoca a propósito
       this.lastDir = 0;
-      this.filled = new Set();              // huecos rellenados por el rescate anti-bucle
+      this.filled = new Set();              // huecos rellenados por el rescate anti-bucle (opción fillHoles)
+      this.done = new Set();                // huecos dados por completados sin bloque (opción de bloques apagada)
       this.plan = null;
       this.events = [];                     // para efectos: {type, cell, value}
     }
 
     // el tablero está completo: lo usa la cuenta atrás de victoria
-    isFull() { return this.bombs.size === 0 && this.snake.length + this.filled.size >= this.total; }
+    // done = casillas vacías que se dieron por completadas al final (opción "rellenar huecos" apagada)
+    isFull() { return this.bombs.size === 0 && this.snake.length + this.filled.size + this.done.size >= this.total; }
 
     // rescate anti-bucle: los huecos a los que ya no puede llegar (con o sin manzana) se rellenan solos
     // Antes del 80 % solo se rellenan huecos pequeños (≤ 3 casillas): una zona grande solo está tapada
@@ -49,7 +51,7 @@
       let n = 0;
       const seen = new Uint8Array(this.total);
       for (let s0 = 0; s0 < this.total; s0++) {
-        if (seen[s0] || this.grid[s0] === BODY || reach[s0] >= 0) continue;
+        if (seen[s0] || this.grid[s0] === BODY || reach[s0] >= 0 || this.done.has(s0)) continue;
         const comp = [s0]; seen[s0] = 1;
         for (let k = 0; k < comp.length; k++) {
           for (let d = 0; d < 4; d++) {
@@ -58,15 +60,21 @@
           }
         }
         if (comp.length > maxComp) continue;
-        for (const i of comp) {
-          this.apples.delete(i); this.bombs.delete(i);
-          this.grid[i] = BODY;
-          this.filled.add(i);
-          this.events.push({ type: 'absorb', cell: i });
-          n++;
-        }
+        for (const i of comp) this.markDone(i);
+        n += comp.length;
       }
       return n;
+    }
+
+    // casilla imposible de rellenar: bloque (opción "rellenar huecos") o, por defecto, completada pero vacía y pisable
+    markDone(i) {
+      this.apples.delete(i); this.bombs.delete(i);
+      if (this.fillHoles) {
+        this.grid[i] = BODY; this.filled.add(i);
+        this.events.push({ type: 'absorb', cell: i });
+      } else {
+        this.grid[i] = FREE; this.done.add(i);
+      }
     }
 
     // botón PERDER: se equivoca en algún momento de los próximos `maxSteps` pasos
@@ -86,9 +94,9 @@
     }
     freeCells() { return this.total; }
     wall(i) { return this.filled.has(i); }
-    progress() { return (this.snake.length + this.filled.size) / this.total; }
+    progress() { return Math.min(1, (this.snake.length + this.filled.size + this.done.size) / this.total); }
     // ¿puede pisar bombas? Muy corta se moriría; con "nunca pierde" no baja de 2
-    bombOk(len) { return this.noLose || len > 3; }
+    bombOk(len) { return this.noLose || len > 3 || (this.apples.size === 0 && this.steps - this.lastEat > this.stallSteps); } // con hambre y sin manzanas se las come aunque sea corta
     // comer una bomba sobre un cuerpo: -1 (primero gasta crecimiento pendiente). Devuelve si muere.
     bombHit(body, grow) {
       if (grow > 0) return { grow: grow - 1, dead: false, cut: null };
@@ -194,6 +202,15 @@
       }
 
       // 2) perseguir la cola por el camino más largo posible (sin encerrarse nunca)
+      // atascada: los huecos imposibles se dan por completados aunque no tenga un movimiento seguro (si no, no acabaría nunca)
+      if (this.stallSteps && this.steps - this.lastEat > this.stallSteps && !this.isFull()) {
+        if (this.absorbHoles() > 0) this.lastEat = this.steps;
+        else { // solo quedan manzanas/bombas imposibles de comer sin encerrarse
+          let empty = false;
+          for (let i = 0; i < this.total && !empty; i++) if (this.grid[i] === FREE && !this.apples.has(i) && !this.done.has(i)) empty = true;
+          if (!empty && (this.apples.size || this.bombs.size)) { for (const c of [...this.apples.keys(), ...this.bombs]) this.markDone(c); this.lastEat = this.steps; }
+        }
+      }
       const chase = this.chaseMove(stalled);
       if (chase >= 0) {
         // rescate anti-bucle: si lleva demasiado sin comer, la manzana atascada "salta" delante de la cabeza
@@ -201,12 +218,9 @@
           if (this.absorbHoles() > 0) { this.lastEat = this.steps; return chase; }
           // solo quedan manzanas imposibles de comer sin encerrarse: se absorben también
           let empty = false;
-          for (let i = 0; i < this.total && !empty; i++) if (this.grid[i] === FREE && !this.apples.has(i)) empty = true;
+          for (let i = 0; i < this.total && !empty; i++) if (this.grid[i] === FREE && !this.apples.has(i) && !this.done.has(i)) empty = true;
           if (!empty && (this.apples.size || this.bombs.size)) {
-            for (const a of [...this.apples.keys(), ...this.bombs]) {
-              this.apples.delete(a); this.bombs.delete(a); this.grid[a] = BODY; this.filled.add(a);
-              this.events.push({ type: 'absorb', cell: a });
-            }
+            for (const a of [...this.apples.keys(), ...this.bombs]) this.markDone(a);
             this.lastEat = this.steps;
             return chase;
           }
@@ -382,7 +396,10 @@
       const tail = this.snake[this.snake.length - 1];
       if (nb < 0 || (this.grid[nb] === BODY && !(nb === tail && this.grow === 0))) {
         // red de seguridad: en vez de chocar, revienta media cola para tener salida (salvo si PERDER está activo)
-        if (!this.failAt && !this._rescued && this._rescueCut()) { this._rescued = true; this.steps--; this.step(); this._rescued = false; return; }
+        // (varios intentos: dar la vuelta o volver a cortar hasta que la cabeza tenga salida)
+        if (!this.failAt && (this._rescues || 0) < 8 && this._rescueCut()) {
+          this._rescues = (this._rescues || 0) + 1; this.steps--; this.step(); this._rescues = 0; return;
+        }
         return this.lose('crash');
       }
       this.dir = d;
@@ -407,7 +424,7 @@
           return this.lose('bomb');
         }
       }
-      this.grid[nb] = BODY;
+      this.grid[nb] = BODY; this.done.delete(nb);
       if (this.isFull()) this.grow = 0; // tablero lleno: ya no cabe crecer (si no, chocaría con su cola)
       if (d !== this.lastDir) this.events.push({ type: 'turn', dir: d });
       this.lastDir = d;
@@ -484,7 +501,7 @@
     // ---------------- aparecer cosas ----------------
     randomFree(filter) {
       const free = [];
-      for (let i = 0; i < this.total; i++) if (this.grid[i] === FREE && !this.apples.has(i) && (!filter || filter(i))) free.push(i);
+      for (let i = 0; i < this.total; i++) if (this.grid[i] === FREE && !this.apples.has(i) && !this.done.has(i) && (!filter || filter(i))) free.push(i);
       return free.length ? free[(this.rng() * free.length) | 0] : -1;
     }
 
@@ -503,7 +520,8 @@
           // en una casilla a la que pueda llegar ya: si cae en una zona tapada por el cuerpo se atasca
           // y el rescate acabaría rellenando esa zona con bloques
           if (!reach) { const tail = this.snake[this.snake.length - 1]; reach = this.bfs(this.snake[0], (i) => (this.grid[i] === BODY && i !== tail) || this.filled.has(i)).dist; }
-          let c = this.randomFree((i) => reach[i] >= 0);
+          // con bloques: solo donde ya puede llegar; sin bloques: en cualquier sitio (así entra en zonas que su cuerpo tapaba)
+          let c = this.fillHoles ? this.randomFree((i) => reach[i] >= 0) : this.randomFree();
           if (c < 0) c = this.randomFree();
           if (c < 0) break;
           const gold = this.queueGold > 0;
