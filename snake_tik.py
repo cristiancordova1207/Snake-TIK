@@ -19,12 +19,12 @@ from collections import deque
 from flask import Flask, jsonify, request, send_from_directory
 
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import (ConnectEvent, DisconnectEvent, GiftEvent,
+from TikTokLive.events import (ConnectEvent, DisconnectEvent, FollowEvent, GiftEvent,
                                LikeEvent, LiveEndEvent)
 
 from account import Account, xcrypt
 
-VERSION = "1.0.6"
+VERSION = "1.0.7"
 PORT = 5010
 
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -38,7 +38,7 @@ ACTIONS = {
     "bombs":   {"name": "bombs", "emoji": "💣"},
     "airdrop": {"name": "airdropAct", "emoji": "✈️"},
 }
-LIVE_SETTINGS = ("speed", "grid", "toasts", "stats", "board", "animal", "color", "speedup", "countdown", "lang", "sound", "discord", "nolose", "notitle", "layout", "fillholes")
+LIVE_SETTINGS = ("speed", "grid", "toasts", "stats", "board", "animal", "color", "speedup", "countdown", "lang", "sound", "discord", "nolose", "notitle", "layout", "fillholes", "toastScale")
 
 # Igual que en el vídeo de referencia
 DEFAULT_CFG = {
@@ -56,6 +56,7 @@ DEFAULT_CFG = {
     "nolose": False,       # la serpiente nunca pierde
     "notitle": False,      # ocultar el título del juego
     "fillholes": False,    # rellenar con bloques los huecos a los que no puede llegar
+    "toastScale": 0.8,     # tamaño de los avisos "Fulano · Rose x5 +5 🍎" (se mueven arrastrándolos en el juego)
     "layout": {},          # piezas movidas con el ratón: {"title": {"x": 0, "y": 0}, ...}
     "discord": "discord.gg/K6TCjKAyds",
     "stats": {"wins": 0, "losses": 0},
@@ -76,7 +77,7 @@ events = deque(maxlen=2000)
 log = deque(maxlen=200)
 seq = 0
 gift_catalog = {}
-state = {"status": "off", "error": "", "game_seen": 0.0, "likes": {}, "fired": {}, "tiktok": "", "started": False, "paused": False}
+state = {"status": "off", "error": "", "game_seen": 0.0, "likes": {}, "fired": {}, "followed": set(), "tiktok": "", "started": False, "paused": False}
 client_box = {"client": None, "loop": None}
 
 
@@ -167,6 +168,22 @@ def handle_likes(user, nick, count):
             fire(nick, r["action"], int(r["amount"]) * times, f"{r['likes']} likes")
 
 
+def handle_follow(user, nick):
+    """Un seguidor nuevo: cada regla de follow se dispara una vez por persona y directo."""
+    if user in state["followed"]:
+        return
+    state["followed"].add(user)
+    for r in cfg["rules"]:
+        if r["kind"] == "follow":
+            fire(nick, r["action"], int(r["amount"]), "follow")
+
+
+def load_gift_catalog():
+    async def go():
+        return await TikTokLiveClient(unique_id="tiktok").web.fetch_gift_list()
+    store_gifts(asyncio.run(go()))
+
+
 def store_gifts(data):
     for g in data.get("gifts", []):
         gift_catalog[g["id"]] = {"id": g["id"], "name": g["name"], "coins": g.get("diamond_count", 0),
@@ -181,7 +198,7 @@ def run_client(unique_id):
 
     @client.on(ConnectEvent)
     async def _c(_):
-        state.update(status="live", error="", likes={}, fired={}, tiktok=unique_id)
+        state.update(status="live", error="", likes={}, fired={}, followed=set(), tiktok=unique_id)
         push({"type": "status", "live": True}, f"🟢 Conectado al LIVE de @{unique_id}")
         threading.Thread(target=ACC.beat_now, daemon=True).start()  # el servidor avisa a Discord
         try:
@@ -210,6 +227,10 @@ def run_client(unique_id):
         except Exception:
             pass
         handle_gift(ev.user.nickname or ev.user.unique_id, g.id, g.name, max(1, ev.repeat_count or 1), g.diamond_count, img)
+
+    @client.on(FollowEvent)
+    async def _f(ev):
+        handle_follow(ev.user.unique_id, ev.user.nickname or ev.user.unique_id)
 
     @client.on(LikeEvent)
     async def _l(ev):
@@ -272,6 +293,33 @@ def ui_file(p):
     return send_from_directory(UI_DIR, p)
 
 
+@app.get("/overlay")
+def overlay():
+    """Overlay para TikTok LIVE Studio con lo que da cada regalo: ?show=gifts | social | all"""
+    return send_from_directory(UI_DIR, "overlay.html")
+
+
+@app.get("/api/overlay")
+def api_overlay():
+    """Datos del overlay: las reglas con la imagen y las monedas de cada regalo."""
+    if not gift_catalog:
+        try:
+            load_gift_catalog()
+        except Exception:
+            pass  # sin imágenes: el overlay enseña el nombre
+    out = []
+    for r in cfg["rules"]:
+        item = {"kind": r["kind"], "action": r["action"], "amount": int(r.get("amount") or 0)}
+        if r["kind"] == "gift":
+            g = gift_catalog.get(r.get("gift_id")) or next((x for x in gift_catalog.values() if x["name"].lower() == r.get("gift_name", "").lower()), {})
+            item.update(name=r.get("gift_name"), img=g.get("img", ""), coins=g.get("coins", 0))
+        elif r["kind"] == "likes":
+            item["likes"] = int(r.get("likes") or 0)
+        out.append(item)
+    out.sort(key=lambda x: ({"gift": 0, "likes": 1, "follow": 2}.get(x["kind"], 3), x.get("coins", 0)))
+    return jsonify({"lang": cfg.get("lang") or "es", "rules": out})
+
+
 @app.get("/api/poll")
 def api_poll():
     """Lo llama la ventana del juego."""
@@ -306,9 +354,7 @@ def api_state():
 def api_gifts():
     if request.args.get("refresh") or not gift_catalog:
         try:
-            async def go():
-                return await TikTokLiveClient(unique_id="tiktok").web.fetch_gift_list()
-            store_gifts(asyncio.run(go()))
+            load_gift_catalog()
         except Exception as ex:
             return jsonify({"error": str(ex), "gifts": list(gift_catalog.values())})
     return jsonify({"gifts": sorted(gift_catalog.values(), key=lambda g: (g["coins"], g["name"]))})
@@ -392,6 +438,8 @@ def api_command():
         push({"type": "lose"}, "💀 Botón PERDER")
     elif c == "reset":
         push({"type": "reset"}, "🔄 Partida reiniciada")
+    elif c == "follow":  # prueba: un seguidor nuevo inventado
+        handle_follow(f"test{time.time()}", d.get("nick") or "Prueba")
     elif c == "add" and d.get("what") in ACTIONS:
         fire(d.get("nick") or "Prueba", d["what"], int(d.get("amount") or 1), "prueba")
     return jsonify({"ok": True})

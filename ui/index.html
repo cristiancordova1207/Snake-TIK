@@ -67,6 +67,7 @@
             <button class="btn btn-ghost btn-sm jelly" data-add="bombs,150">+150 💣</button>
             <button class="btn btn-ghost btn-sm jelly" data-add="gold,1">+1 🍏</button>
             <button class="btn btn-ghost btn-sm jelly" data-add="airdrop,500">✈️ 500 🍎</button>
+            <button class="btn btn-ghost btn-sm jelly" id="testFollow">➕ Follow</button>
           </div>
         </div>
       </div>
@@ -78,7 +79,13 @@
       <p class="sub">🎁 → 🍎 / 💣 / ✈️</p>
       <div class="card">
         <div id="rules"></div>
-        <div class="row"><button class="btn btn-primary btn-sm jelly" id="addGift" data-i18n="addGift"></button><button class="btn btn-ghost btn-sm jelly" id="addLikes" data-i18n="addLikes"></button></div>
+        <div class="row"><button class="btn btn-primary btn-sm jelly" id="addGift" data-i18n="addGift"></button><button class="btn btn-ghost btn-sm jelly" id="addLikes" data-i18n="addLikes"></button><button class="btn btn-ghost btn-sm jelly" id="addFollow" data-i18n="addFollow"></button></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3><span class="ic">📺</span><span data-i18n="ovTitle"></span></h3>
+        <p class="hint" data-i18n="ovHint"></p>
+        <div class="set"><span data-i18n="ovSize"></span><div class="row"><input type="range" id="ovScale" min="0.5" max="2" step="0.1" value="1"><b id="ovScaleV">1</b></div></div>
+        <div class="ovs" id="ovs"></div>
       </div>
     </section>
 
@@ -97,6 +104,7 @@
           <div class="set"><span data-i18n="speedup"></span><button class="toggle" id="speedup"></button></div>
           <div class="set"><span data-i18n="countdown"></span><input type="number" id="countdown" min="3" max="120" style="width:90px"></div>
           <div class="set"><span data-i18n="toasts"></span><button class="toggle" id="toasts"></button></div>
+          <div class="set"><span><span data-i18n="toastSize"></span><br><span class="hint" data-i18n="toastHint"></span></span><div class="row"><input type="range" id="toastScale" min="0.4" max="1.4" step="0.05"><b id="toastScaleV"></b></div></div>
           <div class="set"><span data-i18n="showTitle"></span><button class="toggle" id="showTitle"></button></div>
           <div class="set"><span class="hint" data-i18n="dragHint"></span><button class="btn btn-ghost btn-sm jelly" id="resetLayout" data-i18n="resetLayout"></button></div>
           <div class="set"><span>🏆 <span data-i18n="wins"></span> / 💀 <span data-i18n="losses"></span></span><div class="row"><input type="number" id="wins" style="width:80px"><input type="number" id="losses" style="width:80px"></div></div>

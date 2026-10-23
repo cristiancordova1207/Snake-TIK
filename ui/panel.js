@@ -128,8 +128,9 @@ function renderRules() {
   const acts = ['apples', 'gold', 'bombs', 'airdrop'], names = { apples: '🍎 ' + t('apples'), gold: '🍏 ' + t('gold'), bombs: '💣 ' + t('bombs'), airdrop: '✈️ ' + t('airdropAct') };
   $('#rules').innerHTML = S.cfg.rules.map((r, i) => {
     const g = r.kind === 'gift' ? giftOf(r) : null;
-    const icon = r.kind === 'likes' ? '<span style="font-size:26px">❤️</span>' : (g && g.img ? `<img src="${esc(g.img)}">` : '<span style="font-size:26px">🎁</span>');
-    const label = r.kind === 'likes' ? `${t('every')} <input type="number" data-likes="${i}" value="${r.likes}" min="1" style="width:90px"> ${t('likes')}` : `<b>${esc(r.gift_name)}</b>${g ? ` <span class="hint">${g.coins} 🪙</span>` : ''}`;
+    const icon = r.kind === 'likes' ? '<span style="font-size:26px">❤️</span>' : r.kind === 'follow' ? '<span style="font-size:26px">➕</span>' : (g && g.img ? `<img src="${esc(g.img)}">` : '<span style="font-size:26px">🎁</span>');
+    const label = r.kind === 'likes' ? `${t('every')} <input type="number" data-likes="${i}" value="${r.likes}" min="1" style="width:90px"> ${t('likes')}`
+      : r.kind === 'follow' ? `<b>${t('newFollower')}</b>` : `<b>${esc(r.gift_name)}</b>${g ? ` <span class="hint">${g.coins} 🪙</span>` : ''}`;
     return `<div class="rule">${icon}<span>${label}</span><input type="number" min="1" data-amount="${i}" value="${r.amount}"><select data-action="${i}">${acts.map((a) => `<option value="${a}" ${a === r.action ? 'selected' : ''}>${names[a]}</option>`).join('')}</select><button class="x" data-del="${i}">✕</button></div>`;
   }).join('');
 }
@@ -142,6 +143,26 @@ $('#rules').addEventListener('change', (e) => {
 });
 $('#rules').addEventListener('click', (e) => { const d = e.target.dataset.del; if (d !== undefined) { S.cfg.rules.splice(+d, 1); save({ rules: S.cfg.rules }); renderRules(); } });
 $('#addLikes').onclick = () => { S.cfg.rules.push({ kind: 'likes', likes: 100, action: 'apples', amount: 1 }); save({ rules: S.cfg.rules }); renderRules(); };
+$('#addFollow').onclick = () => { S.cfg.rules.push({ kind: 'follow', action: 'bombs', amount: 10 }); save({ rules: S.cfg.rules }); renderRules(); };
+$('#testFollow').onclick = () => api('/api/command', { cmd: 'follow', nick: 'Prueba' });
+
+// overlays para TikTok LIVE Studio: lo que da cada regalo (con vista previa)
+const OVS = [['gifts', '🎁', 'ovGifts'], ['social', '❤️', 'ovSocial'], ['all', '✨', 'ovAll']];
+function ovUrl(show) { const sc = +$('#ovScale').value; return `${location.origin}/overlay?show=${show}${sc !== 1 ? '&scale=' + sc : ''}`; }
+function renderOverlays() {
+  $('#ovScaleV').textContent = $('#ovScale').value;
+  $('#ovs').innerHTML = OVS.map(([k, e, label]) => `<div class="ov">
+    <div class="row"><b>${e} ${t(label)}</b></div>
+    <div class="row"><input readonly value="${ovUrl(k)}" style="flex:1;font-size:12px"><button class="btn btn-primary btn-sm jelly" data-copy="${k}">📋 ${t('copyLink')}</button></div>
+    <div class="ovprev"><iframe src="${ovUrl(k)}" loading="lazy"></iframe></div></div>`).join('');
+}
+$('#ovScale').onchange = renderOverlays;
+$('#ovScale').oninput = () => ($('#ovScaleV').textContent = $('#ovScale').value);
+$('#ovs').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  try { await navigator.clipboard.writeText(ovUrl(b.dataset.copy)); } catch { b.previousElementSibling.select(); document.execCommand('copy'); }
+  toast('📋 ' + t('copied'));
+});
 async function loadGifts(refresh) { const r = await api('/api/gifts' + (refresh ? '?refresh=1' : '')); gifts = r.gifts || []; }
 function renderGifts() { const q = $('#gq').value.toLowerCase(); $('#gifts').innerHTML = gifts.filter((g) => g.name.toLowerCase().includes(q)).map((g) => `<button class="gift" data-id="${g.id}"><img loading="lazy" src="${esc(g.img)}">${esc(g.name)}<br><span class="hint">${g.coins} 🪙</span></button>`).join(''); }
 function assign(id, name) {
@@ -169,6 +190,7 @@ function renderLook() {
   $('#speed').value = c.speed; $('#speedV').textContent = c.speed;
   $('#speedup').classList.toggle('on', !!c.speedup); $('#toasts').classList.toggle('on', !!c.toasts);
   $('#showTitle').classList.toggle('on', !c.notitle);
+  $('#toastScale').value = c.toastScale ?? 0.8; $('#toastScaleV').textContent = Math.round((c.toastScale ?? 0.8) * 100) + '%';
   $('#countdown').value = c.countdown; $('#wins').value = c.stats.wins; $('#losses').value = c.stats.losses;
 }
 $('#v-look').addEventListener('click', (e) => {
@@ -186,6 +208,7 @@ $('#v-look').addEventListener('change', (e) => {
   const x = e.target;
   if (x.id === 'colorPick') save({ color: x.value }).then(renderLook);
   if (x.id === 'speed') save({ speed: +x.value });
+  if (x.id === 'toastScale') save({ toastScale: +x.value }).then(renderLook);
   if (x.id === 'countdown') save({ countdown: Math.max(3, +x.value || 10) });
   if (x.id === 'wins' || x.id === 'losses') save({ stats: { wins: +$('#wins').value, losses: +$('#losses').value } });
 });
@@ -281,7 +304,7 @@ function renderAll() {
   if (!ACC || !ACC.logged) return;
   $('#nolose').classList.toggle('on', !!S.cfg.nolose);
   $('#fillholes').classList.toggle('on', !!S.cfg.fillholes);
-  renderTT(); renderRules(); renderLook(); renderSounds(); renderAccount();
+  renderTT(); renderRules(); renderOverlays(); renderLook(); renderSounds(); renderAccount();
 }
 async function poll() {
   try {

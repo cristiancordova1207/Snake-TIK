@@ -69,7 +69,7 @@
     });
 
     let S = { speed: 12, grid: 20, toasts: true, stats: { wins: 0, losses: 0 }, board: 'grass', animal: 'snake', color: null,
-      speedup: false, countdown: 10, lang: 'es', discord: '', sound: null, title: 'SNAKE TIK', demo: false, notitle: false, layout: {} };
+      speedup: false, countdown: 10, lang: 'es', discord: '', sound: null, title: 'SNAKE TIK', demo: false, notitle: false, layout: {}, toastScale: 0.8 };
     let game = new SnakeCore.Game(20);
     let prevSnake = game.snake.slice();
     let acc = 0, last = performance.now(), endAt = 0, shake = 0, locked = false, paused = false;
@@ -100,13 +100,17 @@
       progress: [BX, 405, BOARD, 52], board: [BX - 22, BY - 22, BOARD + 44, BOARD + 44], discord: [140, BY + BOARD + 140, 800, 104],
     };
     let drag = null, dropT = 0, hover = null;
+    const TOAST_X = BX + 20, TOAST_Y = BY + 24;
+    const toastScale = () => Math.max(0.4, Math.min(1.4, +S.toastScale || 0.8));
+    const box = (k) => (k === 'toasts' ? [TOAST_X, TOAST_Y, 640 * toastScale(), 262 * toastScale()] : PARTS[k]);
     const off = (k) => (S.layout && S.layout[k]) || { x: 0, y: 0 };
     function withOff(k, fn) { const o = off(k); ctx.save(); ctx.translate(o.x, o.y); fn(); ctx.restore(); }
     function partAt(x, y) {
-      for (const k of ['discord', 'keys', 'stats', 'title', 'progress', 'board']) {
+      for (const k of ['toasts', 'discord', 'keys', 'stats', 'title', 'progress', 'board']) {
+        if (k === 'toasts' && !S.toasts) continue;
         if (k === 'title' && S.notitle) continue;
         if (k === 'discord' && !S.discord) continue;
-        const [bx, by, bw, bh] = PARTS[k], o = off(k);
+        const [bx, by, bw, bh] = box(k), o = off(k);
         if (x >= bx + o.x && x <= bx + o.x + bw && y >= by + o.y && y <= by + o.y + bh) return k;
       }
       return null;
@@ -129,7 +133,7 @@
     }
     function drawDragHint() {
       const k = drag ? drag.k : hover; if (!k) return;
-      const [bx, by, bw, bh] = PARTS[k], o = off(k);
+      const [bx, by, bw, bh] = box(k), o = off(k);
       ctx.save(); ctx.setLineDash([18, 12]); ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,.85)';
       rrect(bx + o.x - 8, by + o.y - 8, bw + 16, bh + 16, 20); ctx.stroke(); ctx.restore();
     }
@@ -473,10 +477,15 @@
       toasts.length = Math.min(toasts.length, 3);
     }
     function drawToasts(t) {
+      const held = (drag && drag.k === 'toasts') || hover === 'toasts';
+      if (held && !toasts.length) toasts.push({ str: 'Ejemplo · Rose x5', sub: '+5 🍎', t0: t, bomb: false });
+      const o0 = off('toasts'), sc = toastScale();
+      ctx.save(); ctx.translate(TOAST_X + o0.x, TOAST_Y + o0.y); ctx.scale(sc, sc);
       toasts.forEach((o, i) => {
+        if (held) o.t0 = t - 300; // quietos y visibles mientras los mueves
         const age = t - o.t0; if (age > 3500) { toasts.splice(i, 1); return; }
         const slide = Math.min(1, age / 250), out = Math.max(0, (age - 3100) / 400);
-        const x = BX + 20 - (1 - slide) * 600 - out * 600, y = BY + 24 + i * 92;
+        const x = -(1 - slide) * 600 - out * 600, y = i * 92;
         ctx.globalAlpha = 1 - out;
         rrect(x, y, 640, 78, 39); ctx.fillStyle = o.bomb ? 'rgba(40,10,20,.82)' : 'rgba(27,11,51,.82)'; ctx.fill();
         ctx.lineWidth = 5; ctx.strokeStyle = o.bomb ? '#ff6b6b' : '#ffd23f'; ctx.stroke();
@@ -486,6 +495,7 @@
         text(o.sub, x + 560, y + 41, 40, o.bomb ? '#ff8a8a' : '#ffe680', { stroke: 8 });
         ctx.globalAlpha = 1;
       });
+      ctx.restore();
     }
     let banner2Obj = null;
     function banner2(str, color, t) { banner2Obj = { str, color, t0: t }; }
@@ -600,7 +610,7 @@
       const alpha = game.state === 'play' ? Math.min(1, acc / (1000 / currentSpeed())) : 1;
       ctx.save();
       if (shake > 0) { ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake); shake *= 0.9; if (shake < 0.5) shake = 0; }
-      drawBackground(t); drawHeader(t); withOff('board', () => { drawBoard(t, alpha); drawToasts(t); }); drawFooter(); drawBanner(t); drawParticles(false); drawDragHint();
+      drawBackground(t); drawHeader(t); withOff('board', () => drawBoard(t, alpha)); drawFooter(); drawToasts(t); drawBanner(t); drawParticles(false); drawDragHint();
       ctx.restore();
       if (locked) drawLocked();
       else if (typeof paused === 'string') { // esperando a que pulsen Start en el panel

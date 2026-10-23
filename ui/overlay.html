@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Snake Tik · overlay</title>
+<style>
+@font-face { font-family: Fredoka; src: url(/ui/fonts/Fredoka.woff2) format("woff2"); font-weight: 300 700; }
+@font-face { font-family: Lilita; src: url(/ui/fonts/LilitaOne.woff2) format("woff2"); }
+html, body { margin: 0; background: transparent; overflow: hidden; font-family: Fredoka, "Segoe UI", sans-serif; color: #fff; }
+#box { position: absolute; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 14px; display: flex; flex-direction: column; gap: 10px; transform-origin: top left; }
+.title { align-self: flex-start; font: 34px/1 Lilita, sans-serif; letter-spacing: .5px; padding: 10px 20px; border-radius: 999px;
+  background: linear-gradient(135deg, #a3e635, #22c55e); color: #fff; -webkit-text-stroke: 1.5px #14532d; paint-order: stroke fill;
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.4), 0 10px 24px -8px rgba(0,0,0,.6); animation: pop .6s cubic-bezier(.34,1.56,.64,1) both; }
+.title.social { background: linear-gradient(135deg, #fb7185, #e11d48); -webkit-text-stroke-color: #4c0519; }
+.viewport { position: relative; flex: 1; overflow: hidden; }
+.list { display: flex; flex-direction: column; gap: 10px; }
+.row { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 16px 8px 8px; border-radius: 22px;
+  background: rgba(20, 14, 34, .78); box-shadow: inset 0 0 0 2px rgba(255,255,255,.08), 0 10px 22px -12px rgba(0,0,0,.8);
+  animation: slide .55s cubic-bezier(.34,1.56,.64,1) both; position: relative; overflow: hidden; }
+.row::after { content: ""; position: absolute; top: 0; bottom: 0; width: 60px; left: -80px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+  transform: skewX(-20deg); animation: sweep 5s ease-in-out infinite; animation-delay: var(--d); }
+.ic { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; font-size: 38px; background: rgba(255,255,255,.07); }
+.ic img { width: 56px; height: 56px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
+.name { font-size: 26px; font-weight: 700; line-height: 1.1; text-shadow: 0 2px 0 rgba(0,0,0,.5); }
+.name small { display: block; font-size: 16px; font-weight: 600; color: #fcd34d; }
+.get { font: 30px/1 Lilita, sans-serif; padding: 8px 14px; border-radius: 16px; white-space: nowrap; -webkit-text-stroke: 1px rgba(0,0,0,.45); paint-order: stroke fill; }
+.apples { background: linear-gradient(135deg, #4ade80, #16a34a); } .bombs { background: linear-gradient(135deg, #fb7185, #be123c); }
+.gold { background: linear-gradient(135deg, #fde047, #d97706); } .airdrop { background: linear-gradient(135deg, #60a5fa, #7c3aed); }
+@keyframes pop { from { opacity: 0; transform: scale(.6); } }
+@keyframes slide { from { opacity: 0; transform: translateX(-40px) scale(.95); } }
+@keyframes sweep { 0%, 70% { left: -80px; } 100% { left: 110%; } }
+</style>
+</head>
+<body>
+<div id="box"><div class="title" id="title"></div><div class="viewport"><div class="list" id="list"></div></div></div>
+<script>
+// ?show=gifts (solo regalos) | social (likes y follows) | all · ?scale=1 (tamaño)
+const q = new URLSearchParams(location.search);
+const show = q.get('show') || 'all';
+const T = {
+  es: { gifts: '🎁 REGALOS', social: '❤️ LIKES Y FOLLOWS', all: '🎁 QUÉ DA CADA REGALO', likes: '{n} likes', follow: 'Seguirme', each: 'cada vez', once: 'una vez' },
+  en: { gifts: '🎁 GIFTS', social: '❤️ LIKES & FOLLOWS', all: '🎁 WHAT EACH GIFT DOES', likes: '{n} likes', follow: 'Follow me', each: 'every time', once: 'once' },
+  pt: { gifts: '🎁 PRESENTES', social: '❤️ CURTIDAS E SEGUIDORES', all: '🎁 O QUE CADA PRESENTE FAZ', likes: '{n} curtidas', follow: 'Me seguir', each: 'cada vez', once: 'uma vez' },
+  fr: { gifts: '🎁 CADEAUX', social: '❤️ J’AIME ET ABONNÉS', all: '🎁 CE QUE FAIT CHAQUE CADEAU', likes: '{n} j’aime', follow: 'S’abonner', each: 'à chaque fois', once: 'une fois' },
+  de: { gifts: '🎁 GESCHENKE', social: '❤️ LIKES & FOLLOWS', all: '🎁 WAS JEDES GESCHENK MACHT', likes: '{n} Likes', follow: 'Folgen', each: 'jedes Mal', once: 'einmal' },
+  it: { gifts: '🎁 REGALI', social: '❤️ MI PIACE E FOLLOW', all: '🎁 COSA FA OGNI REGALO', likes: '{n} mi piace', follow: 'Seguimi', each: 'ogni volta', once: 'una volta' },
+};
+const EMO = { apples: '🍎', bombs: '💣', gold: '🍏', airdrop: '✈️🍎' };
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+document.getElementById('box').style.transform = `scale(${Math.max(0.4, Math.min(2.5, +q.get('scale') || 1))})`;
+document.getElementById('box').style.width = document.getElementById('box').style.height = `${100 / (Math.max(0.4, Math.min(2.5, +q.get('scale') || 1)))}%`;
+let last = '';
+async function load() {
+  let d;
+  try { d = await fetch('/api/overlay').then((r) => r.json()); } catch { return; }
+  const L = T[q.get('lang') || d.lang] || T.es;
+  const rules = d.rules.filter((r) => show === 'all' || (show === 'gifts' ? r.kind === 'gift' : r.kind !== 'gift'));
+  const key = JSON.stringify([L, rules]);
+  if (key === last) return;
+  last = key;
+  const title = document.getElementById('title');
+  title.textContent = L[show] || L.all;
+  title.className = 'title' + (show === 'social' ? ' social' : '');
+  document.getElementById('list').innerHTML = rules.map((r, i) => {
+    const ic = r.kind === 'likes' ? '❤️' : r.kind === 'follow' ? '➕' : r.img ? `<img src="${esc(r.img)}" alt="">` : '🎁';
+    const name = r.kind === 'likes' ? `${esc(L.likes.replace('{n}', r.likes))}<small>${esc(L.each)}</small>`
+      : r.kind === 'follow' ? `${esc(L.follow)}<small>${esc(L.once)}</small>`
+      : `${esc(r.name)}${r.coins ? `<small>🪙 ${r.coins}</small>` : ''}`;
+    return `<div class="row" style="animation-delay:${i * 70}ms;--d:${i * 0.4}s"><div class="ic">${ic}</div><div class="name">${name}</div><div class="get ${r.action}">+${r.amount} ${EMO[r.action] || ''}</div></div>`;
+  }).join('');
+  scroll();
+}
+// si no caben todos, la lista sube despacio y vuelve a empezar
+let anim;
+function scroll() {
+  const vp = document.querySelector('.viewport'), list = document.getElementById('list');
+  if (anim) anim.cancel();
+  const extra = list.scrollHeight - vp.clientHeight;
+  if (extra <= 0) return;
+  const dur = 3000 + extra * 25;
+  anim = list.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(0)', offset: 0.15 }, { transform: `translateY(${-extra}px)`, offset: 0.85 }, { transform: `translateY(${-extra}px)` }],
+    { duration: dur * 2, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+}
+load();
+setInterval(load, 3000);
+addEventListener('resize', scroll);
+</script>
+</body>
+</html>
