@@ -7,6 +7,7 @@ const SR = env.SUPABASE_SERVICE_ROLE_KEY;
 const GUILD = '1506294281801957406';
 const VOUCH_CHANNEL = '1506296971453923399';
 const SITE = 'https://snaketik.pages.dev';
+const DANCE_SITE = 'https://robloxdance.pages.dev';
 
 // productos del canal "Scripts / Games" (valor, nombre visible, prefijo del ticket)
 const PRODUCTS: [string, string, string, string][] = [
@@ -95,6 +96,11 @@ function welcome(kind: string, product: string | null, user: string) {
     return `👋 <@${user}>\n🐍 **Snake TikTok AFK**\n\n` +
       `🇬🇧 Download the program here: ${SITE}\nInside the program there is an option to **choose the plan you want** (Monthly or Lifetime) and pay by card.\n` +
       `🇪🇸 Descarga el programa aquí: ${SITE}\nDentro del programa hay una opción para **elegir el plan que quieras** (Mensual o Lifetime) y pagar con tarjeta.`;
+  }
+  if (product === 'farm-followers-tiktok') { // = Roblox Dance (juego "GRanja Followers")
+    return `👋 <@${user}>\n💫 **Farm Followers TikTok (Roblox Dance)**\n\n` +
+      `🇬🇧 Download the program here: ${DANCE_SITE}\nInside the program you can **choose your plan** and pay by card. Then join the Roblox game and it connects by itself.\n` +
+      `🇪🇸 Descarga el programa aquí: ${DANCE_SITE}\nDentro del programa puedes **elegir tu plan** y pagar con tarjeta. Después entras al juego de Roblox y se conecta solo.`;
   }
   return `👋 <@${user}>\n${p?.[3] ?? '🛒'} **${p?.[1] ?? product}**\n\n🇬🇧 Thanks! A staff member will reply soon with the price and payment options.\n🇪🇸 ¡Gracias! Alguien del equipo te responderá pronto con el precio y las formas de pago.`;
 }
