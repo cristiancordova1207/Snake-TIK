@@ -18,7 +18,7 @@ const PRODUCTS: [string, string, string, string][] = [
   ['visual-gift', 'Visual Gift', 'VisualGift', '✨'],
   ['auction-board', 'Auction Board', 'AuctionBoard', '🎬'],
 ];
-const TRIALS = ['snake-tiktok-afk']; // juegos con prueba gratuita
+const TRIALS = ['snake-tiktok-afk', 'farm-followers-tiktok']; // juegos con prueba gratuita
 // categorías del servidor (se buscan por nombre sin emojis; la primera de la lista es la que se crea si no existe ninguna)
 const CATEGORIES = { buy: ['Ticket Buy', 'Tickets Compras'], support: ['Ticket Support', 'Tickets Support'], trial: ['Ticket Trial', 'Tickets Pruebas'] } as const;
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -85,9 +85,10 @@ async function category(kind: keyof typeof CATEGORIES, channels: any[], appId: s
 function welcome(kind: string, product: string | null, user: string) {
   const p = PRODUCTS.find((x) => x[0] === product);
   if (kind === 'trial') {
+    const app = product === 'farm-followers-tiktok' ? 'Roblox Dance' : 'Snake Tik';
     return `👋 <@${user}>\n🎁 **Free trial · ${p?.[1] ?? product}**\n\n` +
-      `🇬🇧 To get a free trial you must send a **Vouch** message in <#${VOUCH_CHANNEL}>. Then tell us your **Snake Tik username** here and we will activate it.\n` +
-      `🇪🇸 Para acceder a una prueba gratuita debes enviar un mensaje de **Vouch** en <#${VOUCH_CHANNEL}>. Después dinos aquí tu **usuario de Snake Tik** y te la activamos.`;
+      `🇬🇧 To get a free trial you must send a **Vouch** message in <#${VOUCH_CHANNEL}>. Then tell us your **${app} username** here and we will activate it.\n` +
+      `🇪🇸 Para acceder a una prueba gratuita debes enviar un mensaje de **Vouch** en <#${VOUCH_CHANNEL}>. Después dinos aquí tu **usuario de ${app}** y te la activamos.`;
   }
   if (kind === 'support') {
     return `👋 <@${user}>\n🛟 **Support**\n\n🇬🇧 Tell us what happened (program, version, a screenshot helps). A staff member will reply soon.\n🇪🇸 Cuéntanos qué pasa (programa, versión, una captura ayuda). Alguien del equipo te responderá pronto.`;

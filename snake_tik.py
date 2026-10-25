@@ -24,7 +24,7 @@ from TikTokLive.events import (ConnectEvent, DisconnectEvent, FollowEvent, GiftE
 
 from account import Account, xcrypt
 
-VERSION = "1.0.7"
+VERSION = "1.0.8"
 PORT = 5010
 
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))

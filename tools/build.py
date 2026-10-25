@@ -41,7 +41,7 @@ StringStruct('FileVersion', '{VERSION}'), StringStruct('ProductName', 'Snake Tik
 VarFileInfo([VarStruct('Translation', [1033, 1200])])])""")
     cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--onefile", "--noconsole", "--name", "Snake-Tik",
            "--icon", os.path.join(ROOT, "assets", "snaketik.ico"), "--version-file", os.path.join(build, "version.txt"),
-           "--add-data", os.path.join(build, "ui") + ";ui", "--collect-all", "TikTokLive",
+           "--add-data", os.path.join(build, "ui") + ";ui", "--collect-all", "TikTokLive", "--copy-metadata", "betterproto",
            "--workpath", os.path.join(build, "pyi"), "--specpath", build, "--distpath", os.path.join(ROOT, "dist"),
            os.path.join(ROOT, "snake_tik.py")]
     subprocess.run(cmd, check=True)
