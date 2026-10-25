@@ -24,7 +24,7 @@ from TikTokLive.events import (ConnectEvent, DisconnectEvent, FollowEvent, GiftE
 
 from account import Account, xcrypt
 
-VERSION = "1.0.8"
+VERSION = "1.0.9"
 PORT = 5010
 
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -518,6 +518,14 @@ def latest_release():
     return info
 
 
+def clean_env():
+    """Entorno para lanzar otra copia del .exe: con las variables _PYI_* heredadas buscaría la carpeta _MEI
+    de este proceso ("Failed to load Python DLL" si ya se cerró)."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("_PYI") and k != "_MEIPASS2"}
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env
+
+
 def install_update(url):
     """Descarga el .exe nuevo y lo cambia por el actual cuando este se cierra (solo en el .exe)."""
     import tempfile
@@ -531,12 +539,24 @@ def install_update(url):
         f.write(f"""@echo off
 :wait
 tasklist /FI "PID eq {os.getpid()}" | find "{os.getpid()}" >nul && (timeout /t 1 /nobreak >nul & goto wait)
-copy /y "{tmp}" "{exe}" >nul
+tasklist /FI "PID eq {os.getppid()}" | find "{os.getppid()}" >nul && (timeout /t 1 /nobreak >nul & goto wait)
+set n=0
+:copy
+copy /y "{tmp}" "{exe}" >nul && goto run
+set /a n+=1
+if %n% lss 60 (timeout /t 1 /nobreak >nul & goto copy)
+:run
 start "" "{exe}"
 del "{tmp}"
 del "%~f0"
 """)
-    subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000)  # sin ventana
+    # espera al proceso y a su lanzador (PyInstaller onefile: el lanzador bloquea el .exe y mete a sus hijos
+    # en un "job" que se cierra con él), por eso el .bat sale del job (CREATE_BREAKAWAY_FROM_JOB)
+    env = clean_env()
+    try:
+        subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000 | 0x01000000, env=env)
+    except OSError:
+        subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000, env=env)
     threading.Timer(1.0, lambda: os._exit(0)).start()
 
 
@@ -670,7 +690,7 @@ def self_install():
             winreg.SetValueEx(k, "NoModify", 0, winreg.REG_DWORD, 1)
     except OSError:
         pass
-    subprocess.Popen([INSTALLED_EXE])
+    subprocess.Popen([INSTALLED_EXE], env=clean_env())
     sys.exit(0)
 
 
