@@ -336,7 +336,28 @@ async function checkUpdate() {
   $('#upNotes').textContent = u.notes || '';
   $('#sUpdate').hidden = false;
   $('#upLater').onclick = () => { $('#sUpdate').hidden = true; };
-  $('#upGo').onclick = async () => { $('#upGo').disabled = true; $('#upMsg').textContent = '⏬ …'; const r = await api('/api/update', { go: true }); $('#upMsg').textContent = r.error || '✓'; };
+  $('#upGo').onclick = runUpdate;
+}
+// descarga en segundo plano: el servidor cuenta los bytes en /api/update/progress y luego se reinicia solo
+async function runUpdate() {
+  const busy = (b) => { $('#upGo').disabled = $('#upLater').disabled = b; };
+  busy(true);
+  $('#upMsg').textContent = '⏬ …';
+  const r = await api('/api/update', { go: true });
+  if (r.error) { $('#upMsg').textContent = r.error; busy(false); return; }
+  $('#upBar').hidden = false;
+  const tick = async () => {
+    let p;
+    try { p = await (await fetch('/api/update/progress')).json(); } catch { // el programa se cerró para instalar
+      $('#upBar i').style.width = '100%'; $('#upMsg').textContent = '🔄 …'; setTimeout(() => window.close(), 4000); return;
+    }
+    if (p.state === 'error') { $('#upMsg').textContent = '⚠️ ' + p.error; $('#upBar').hidden = true; busy(false); return; }
+    const pct = p.state === 'restarting' ? 100 : p.total ? Math.min(100, (p.done / p.total) * 100) : 0;
+    $('#upBar i').style.width = pct + '%';
+    $('#upMsg').textContent = p.state === 'restarting' ? '🔄 …' : `⏬ ${Math.round(pct)}% · ${(p.done / 1e6).toFixed(1)} / ${(p.total / 1e6 || 0).toFixed(1)} MB`;
+    setTimeout(tick, 300);
+  };
+  tick();
 }
 
 (async () => {

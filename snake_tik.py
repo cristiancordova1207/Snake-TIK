@@ -518,6 +518,9 @@ def latest_release():
     return info
 
 
+_prog = {"state": "idle", "done": 0, "total": 0, "error": ""}  # barra de progreso de la actualización
+
+
 def clean_env():
     """Entorno para lanzar otra copia del .exe: con las variables _PYI_* heredadas buscaría la carpeta _MEI
     de este proceso ("Failed to load Python DLL" si ya se cerró)."""
@@ -532,7 +535,11 @@ def install_update(url):
     tmp = os.path.join(tempfile.gettempdir(), "SnakeTik-update.exe")
     req = urllib.request.Request(url, headers={"User-Agent": "SnakeTik"})
     with urllib.request.urlopen(req, timeout=300) as r, open(tmp, "wb") as f:
-        shutil.copyfileobj(r, f)
+        _prog.update(state="downloading", done=0, total=int(r.headers.get("Content-Length") or 0), error="")
+        while chunk := r.read(65536):
+            f.write(chunk)
+            _prog["done"] += len(chunk)
+    _prog["state"] = "restarting"
     exe = sys.executable
     bat = os.path.join(tempfile.gettempdir(), "SnakeTik-update.bat")
     with open(bat, "w", encoding="utf-8") as f:
@@ -560,6 +567,11 @@ del "%~f0"
     threading.Timer(1.0, lambda: os._exit(0)).start()
 
 
+@app.get("/api/update/progress")
+def api_update_progress():
+    return jsonify(_prog)
+
+
 @app.route("/api/update", methods=["GET", "POST"])
 def api_update():
     try:
@@ -570,10 +582,16 @@ def api_update():
     if request.method == "POST" and available:
         if not FROZEN:
             return jsonify({"error": "Solo se actualiza el .exe"})
-        try:
-            install_update(info["url"])
-        except Exception as ex:
-            return jsonify({"error": str(ex)})
+        if _prog["state"] in ("downloading", "restarting"):
+            return jsonify({"ok": True})
+        _prog.update(state="downloading", done=0, total=0, error="")
+
+        def run():
+            try:
+                install_update(info["url"])
+            except Exception as ex:
+                _prog.update(state="error", error=str(ex))
+        threading.Thread(target=run, daemon=True).start()
         return jsonify({"ok": True})
     return jsonify({"available": available, "current": VERSION, **info})
 
