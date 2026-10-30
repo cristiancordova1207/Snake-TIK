@@ -1,6 +1,6 @@
 // Snake Tik + Roblox Dance · webhook de Stripe (--no-verify-jwt). No hace falta secreto de firma:
 // cada evento se vuelve a pedir a la API de Stripe por su id, así solo se aceptan eventos reales.
-// Solo trata lo que lleva metadata.app = "snaketik" o "robloxdance"; lo de FLUX lo ignora.
+// Solo trata lo que lleva metadata.app = "snaketik" o "robloxdance" o "robloxfashion"; lo de FLUX lo ignora.
 const env = Deno.env.toObject();
 const DB = `${env.SUPABASE_URL}/rest/v1`;
 const SR = env.SUPABASE_SERVICE_ROLE_KEY;
@@ -9,6 +9,7 @@ const SR = env.SUPABASE_SERVICE_ROLE_KEY;
 const APPS: Record<string, { t: string; key: string }> = {
   snaketik: { t: 'snake', key: 'snaketik_user' },
   robloxdance: { t: 'dance', key: 'dance_user' },
+  robloxfashion: { t: 'fashion', key: 'fashion_user' },
 };
 
 async function db(method: string, path: string, body?: unknown) {
@@ -54,7 +55,11 @@ Deno.serve(async (req) => {
     let r = 'ignored';
     if (ev.type === 'checkout.session.completed' && APPS[app]) {
       const userId = o.metadata[APPS[app].key];
-      if (o.mode === 'payment' && o.payment_status === 'paid') {
+      if (o.mode === 'payment' && o.payment_status === 'paid' && o.metadata?.product === 'premium') { // Pack Premium (Fashion): pago único
+        await db('PATCH', `${APPS[app].t}_users?id=eq.${userId}`, { premium: true });
+        await payment(app, userId, 'premium', o.amount_total, o.currency, o.payment_intent || o.id);
+        r = 'premium';
+      } else if (o.mode === 'payment' && o.payment_status === 'paid') {
         await db('PATCH', `${APPS[app].t}_users?id=eq.${userId}`, { plan: 'lifetime', plan_until: null });
         await payment(app, userId, 'lifetime', o.amount_total, o.currency, o.payment_intent || o.id);
         r = 'lifetime';
